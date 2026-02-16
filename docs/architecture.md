@@ -1,4 +1,4 @@
-# Technical Foundation – Phase 0
+# Technical Foundation
 
 Before writing a single line of code, I wanted to define the rules of this project. This isn’t just a document scanner — it’s a local-first knowledge engine, a system that extracts, organizes, and makes information searchable, entirely offline. To build something robust and maintainable, I knew the foundation had to be solid. Phase 0 is about defining that foundation.
 
