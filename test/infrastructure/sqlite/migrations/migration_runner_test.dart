@@ -4,7 +4,10 @@ import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runn
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 class Sqlite3MigrationDb implements MigrationDb {
-  Sqlite3MigrationDb(this._db);
+  Sqlite3MigrationDb(this._db) {
+    // Ensure foreign key enforcement is enabled for all connections.
+    _db.execute('PRAGMA foreign_keys = ON');
+  }
 
   final sqlite.Database _db;
 
@@ -40,6 +43,15 @@ class Sqlite3MigrationDb implements MigrationDb {
 
 void main() {
   group('MigrationRunner', () {
+    test('enables foreign key enforcement', () async {
+      final rawDb = sqlite.sqlite3.openInMemory();
+      final db = Sqlite3MigrationDb(rawDb);
+
+      final pragmaRows = await db.query('PRAGMA foreign_keys');
+      expect(pragmaRows, isNotEmpty);
+      expect(pragmaRows.single['foreign_keys'], 1);
+    });
+
     test('creates schema_migrations and records applied migrations', () async {
       final db = Sqlite3MigrationDb(sqlite.sqlite3.openInMemory());
 
