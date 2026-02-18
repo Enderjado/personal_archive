@@ -1,7 +1,14 @@
 -- 002_add_documents_and_pages.sql
 -- Introduce core tables for documents and pages.
--- Later migrations may extend these tables, but this file is
--- responsible for the initial `documents` and `pages` structures.
+-- documents.place_id references places, so create places first.
+
+CREATE TABLE IF NOT EXISTS places (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 
 CREATE TABLE documents (
   id TEXT PRIMARY KEY,

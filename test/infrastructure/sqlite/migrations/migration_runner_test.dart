@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart';
@@ -41,7 +42,26 @@ class Sqlite3MigrationDb implements MigrationDb {
   }
 }
 
+Future<List<Migration>> _loadTestMigrations() async {
+  final initSql =
+      await rootBundle.loadString('assets/sql/migrations/001_init_core_schema.sql');
+  final documentsAndPagesSql =
+      await rootBundle.loadString('assets/sql/migrations/002_add_documents_and_pages.sql');
+
+  return <Migration>[
+    Migration(
+      name: '001_init_core_schema',
+      sql: initSql,
+    ),
+    Migration(
+      name: '002_add_documents_and_pages',
+      sql: documentsAndPagesSql,
+    ),
+  ];
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('MigrationRunner', () {
     test('enables foreign key enforcement', () async {
       final rawDb = sqlite.sqlite3.openInMemory();
@@ -115,6 +135,114 @@ void main() {
 
       expect(appliedNames.length, 1);
       expect(appliedNames.single, '001_init_core_schema');
+    });
+
+    test('applies documents and pages schema and supports basic operations',
+        () async {
+      final db = Sqlite3MigrationDb(sqlite.sqlite3.openInMemory());
+
+      final runner = MigrationRunner(
+        db: db,
+        loadMigrations: _loadTestMigrations,
+      );
+
+      await runner.runAll();
+
+      // Insert a document row.
+      await db.execute(
+        '''
+INSERT INTO documents (
+  id, title, file_path, status, confidence_score, place_id, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+''',
+        [
+          'doc-1',
+          'Test Document',
+          '/tmp/test.pdf',
+          'imported',
+          null,
+          null,
+          1,
+          2,
+        ],
+      );
+
+      // Insert multiple page rows for the document.
+      await db.execute(
+        '''
+INSERT INTO pages (
+  id, document_id, page_number, raw_text, processed_text, ocr_confidence
+) VALUES (?, ?, ?, ?, ?, ?)
+''',
+        [
+          'page-1',
+          'doc-1',
+          1,
+          'raw 1',
+          'processed 1',
+          0.9,
+        ],
+      );
+
+      await db.execute(
+        '''
+INSERT INTO pages (
+  id, document_id, page_number, raw_text, processed_text, ocr_confidence
+) VALUES (?, ?, ?, ?, ?, ?)
+''',
+        [
+          'page-2',
+          'doc-1',
+          2,
+          'raw 2',
+          'processed 2',
+          0.8,
+        ],
+      );
+
+      // Read back and verify.
+      final documents = await db.query('SELECT * FROM documents', const []);
+      expect(documents, hasLength(1));
+
+      final pages = await db.query(
+        'SELECT * FROM pages WHERE document_id = ? ORDER BY page_number',
+        ['doc-1'],
+      );
+      expect(pages, hasLength(2));
+      expect(pages.first['page_number'], 1);
+      expect(pages.last['page_number'], 2);
+
+      // Uniqueness constraint on (document_id, page_number) should be enforced.
+      await expectLater(
+        db.execute(
+          '''
+INSERT INTO pages (
+  id, document_id, page_number, raw_text, processed_text, ocr_confidence
+) VALUES (?, ?, ?, ?, ?, ?)
+''',
+          [
+            'page-duplicate',
+            'doc-1',
+            1, // duplicate page_number for same document_id
+            'raw dup',
+            'processed dup',
+            0.7,
+          ],
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+
+      // Deleting the document should cascade to its pages.
+      await db.execute(
+        'DELETE FROM documents WHERE id = ?',
+        ['doc-1'],
+      );
+
+      final remainingPages = await db.query(
+        'SELECT * FROM pages WHERE document_id = ?',
+        ['doc-1'],
+      );
+      expect(remainingPages, isEmpty);
     });
   });
 }
