@@ -95,3 +95,22 @@ Any new foreign keys introduced in later phases should explicitly choose between
 
 The rationale for non‑obvious choices should be captured either here or in an Architecture Decision Record under `docs/decisions/`.
 
+---
+
+### 6. Migration Files & Versioning
+
+- **Migration metadata table**
+  - A dedicated `schema_migrations` table tracks which migrations have been applied:
+    - `id` – `INTEGER PRIMARY KEY AUTOINCREMENT`
+    - `name` – `TEXT NOT NULL` (e.g., `001_init_core_schema`)
+    - `applied_at` – `INTEGER NOT NULL` (Unix epoch milliseconds in UTC)
+- **Storage location**
+  - Migration definitions are stored as `.sql` files under `assets/sql/migrations/`.
+  - Filenames start with a zero‑padded numeric prefix followed by a descriptive name, e.g.:
+    - `001_init_core_schema.sql`
+    - `002_add_documents_and_pages.sql`
+- **Ordering & idempotence**
+  - Migrations are applied in **lexicographical filename order**, which matches numeric prefix order.
+  - Each migration is applied at most once; applied migrations are recorded in `schema_migrations` by `name`.
+  - Migration runners must assume foreign keys are enabled and wrap each migration in a transaction.
+
