@@ -1,0 +1,57 @@
+import 'migration.dart';
+import 'schema_migrations_table.dart';
+
+/// Minimal abstraction over the underlying SQLite client used for migrations.
+///
+/// This keeps the migration runner independent of a specific package
+/// (e.g. `sqflite`, `sqlite3`) while still being easy to adapt.
+abstract class MigrationDb {
+  /// Execute a single SQL statement.
+  Future<void> execute(String sql);
+
+  /// Run [action] inside a transaction.
+  ///
+  /// Implementations are responsible for beginning, committing, and
+  /// rolling back the transaction as needed.
+  Future<T> transaction<T>(Future<T> Function() action);
+}
+
+/// Coordinates applying schema migrations against a SQLite database.
+class MigrationRunner {
+  MigrationRunner({
+    required this.db,
+    required this.loadMigrations,
+  });
+
+  /// Database adapter used by the runner.
+  final MigrationDb db;
+
+  /// Function that returns the full set of known migrations.
+  ///
+  /// A later task will wire this up to `.sql` files under
+  /// `assets/sql/migrations/`.
+  final Future<List<Migration>> Function() loadMigrations;
+
+  /// Ensures the `schema_migrations` metadata table exists.
+  Future<void> ensureMetadataTable() async {
+    await db.execute(createSchemaMigrationsTableSql);
+  }
+
+  /// Runs all known migrations inside a single transaction.
+  ///
+  /// Idempotency and recording of applied migrations are handled in
+  /// a later task; this method focuses on the basic execution flow.
+  Future<void> runAll() async {
+    await ensureMetadataTable();
+
+    final migrations = await loadMigrations();
+    final ordered = sortMigrationsByName(migrations);
+
+    await db.transaction<void>(() async {
+      for (final migration in ordered) {
+        await db.execute(migration.sql);
+      }
+    });
+  }
+}
+
