@@ -6,8 +6,11 @@ import 'schema_migrations_table.dart';
 /// This keeps the migration runner independent of a specific package
 /// (e.g. `sqflite`, `sqlite3`) while still being easy to adapt.
 abstract class MigrationDb {
-  /// Execute a single SQL statement.
-  Future<void> execute(String sql);
+  /// Execute a single SQL statement with optional positional parameters.
+  Future<void> execute(String sql, [List<Object?> parameters]);
+
+  /// Run a `SELECT` query and return raw rows.
+  Future<List<Map<String, Object?>>> query(String sql, [List<Object?> parameters]);
 
   /// Run [action] inside a transaction.
   ///
@@ -34,22 +37,47 @@ class MigrationRunner {
 
   /// Ensures the `schema_migrations` metadata table exists.
   Future<void> ensureMetadataTable() async {
-    await db.execute(createSchemaMigrationsTableSql);
+    await db.execute(createSchemaMigrationsTableSql, const []);
+  }
+
+  /// Loads the set of already applied migration names.
+  Future<Set<String>> _loadAppliedMigrationNames() async {
+    await ensureMetadataTable();
+    final rows = await db.query(
+      'SELECT name FROM schema_migrations',
+      const [],
+    );
+    return rows
+        .map((row) => row['name'])
+        .whereType<String>()
+        .toSet();
+  }
+
+  Future<void> _recordAppliedMigration(String name) async {
+    final appliedAt = DateTime.now().toUtc().millisecondsSinceEpoch;
+    await db.execute(
+      'INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)',
+      [name, appliedAt],
+    );
   }
 
   /// Runs all known migrations inside a single transaction.
   ///
   /// Idempotency and recording of applied migrations are handled in
-  /// a later task; this method focuses on the basic execution flow.
+  /// this method.
   Future<void> runAll() async {
-    await ensureMetadataTable();
-
     final migrations = await loadMigrations();
     final ordered = sortMigrationsByName(migrations);
+    final applied = await _loadAppliedMigrationNames();
 
     await db.transaction<void>(() async {
       for (final migration in ordered) {
-        await db.execute(migration.sql);
+        if (applied.contains(migration.name)) {
+          continue;
+        }
+
+        await db.execute(migration.sql, const []);
+        await _recordAppliedMigration(migration.name);
       }
     });
   }
