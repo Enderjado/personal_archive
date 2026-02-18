@@ -74,6 +74,36 @@ void main() {
 
       expect(appliedNames, contains('001_init_core_schema'));
     });
+
+    test('is idempotent when run multiple times', () async {
+      final db = Sqlite3MigrationDb(sqlite.sqlite3.openInMemory());
+
+      final migrations = <Migration>[
+        const Migration(
+          name: '001_init_core_schema',
+          sql: '',
+        ),
+      ];
+
+      final runner = MigrationRunner(
+        db: db,
+        loadMigrations: () async => migrations,
+      );
+
+      await runner.runAll();
+      await runner.runAll();
+
+      final appliedRows = await db.query(
+        'SELECT name FROM schema_migrations',
+      );
+      final appliedNames = appliedRows
+          .map((row) => row['name'])
+          .whereType<String>()
+          .toList();
+
+      expect(appliedNames.length, 1);
+      expect(appliedNames.single, '001_init_core_schema');
+    });
   });
 }
 
