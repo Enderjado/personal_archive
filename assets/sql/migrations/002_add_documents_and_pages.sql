@@ -16,6 +16,13 @@ CREATE TABLE documents (
 );
 
 CREATE TABLE pages (
-  id TEXT PRIMARY KEY
+  id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL,
+  page_number INTEGER NOT NULL,
+  raw_text TEXT,
+  processed_text TEXT,
+  ocr_confidence REAL,
+  FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+  UNIQUE (document_id, page_number)
 );
 
