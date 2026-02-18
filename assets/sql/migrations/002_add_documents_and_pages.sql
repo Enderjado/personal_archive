@@ -26,3 +26,10 @@ CREATE TABLE pages (
   UNIQUE (document_id, page_number)
 );
 
+CREATE INDEX idx_documents_status ON documents(status);
+CREATE INDEX idx_documents_place_id ON documents(place_id);
+CREATE INDEX idx_documents_created_at_status
+  ON documents(created_at, status);
+
+CREATE INDEX idx_pages_document_id ON pages(document_id);
+
