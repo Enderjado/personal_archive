@@ -114,3 +114,11 @@ The rationale for non‑obvious choices should be captured either here or in an 
   - Each migration is applied at most once; applied migrations are recorded in `schema_migrations` by `name`.
   - Migration runners must assume foreign keys are enabled and wrap each migration in a transaction.
 
+- **Implemented migrations** (current schema under `assets/sql/migrations/`)
+  - **`001_init_core_schema.sql`** – No-op; the migration runner creates the `schema_migrations` table itself.
+  - **`002_add_documents_and_pages.sql`** – Creates:
+    - `places` (created first so `documents.place_id` can reference it): `id`, `name` NOT NULL UNIQUE, `description`, `created_at`, `updated_at`.
+    - `documents`: `id`, `title`, `file_path`, `status`, `confidence_score`, `place_id` (FK → `places.id` ON DELETE RESTRICT), `created_at`, `updated_at`.
+    - `pages`: `id`, `document_id` (FK → `documents.id` ON DELETE CASCADE), `page_number`, `raw_text`, `processed_text`, `ocr_confidence`; UNIQUE `(document_id, page_number)`.
+    - Indices: `idx_documents_status`, `idx_documents_place_id`, `idx_documents_created_at_status`, `idx_pages_document_id`.
+
