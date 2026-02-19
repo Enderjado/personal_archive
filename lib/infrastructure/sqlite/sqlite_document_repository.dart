@@ -3,14 +3,15 @@ import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [DocumentRepository].
 ///
-/// Uses [MigrationDb] for execution; stores dates as Unix seconds (INTEGER).
+/// Uses [MigrationDb] for execution; stores dates as Unix epoch
+/// milliseconds (INTEGER) in UTC.
 class SqliteDocumentRepository implements DocumentRepository {
   SqliteDocumentRepository(this._db);
 
   final MigrationDb _db;
 
-  static int _toUnixSeconds(DateTime dateTime) {
-    return dateTime.toUtc().millisecondsSinceEpoch ~/ 1000;
+  static int _toEpochMillis(DateTime dateTime) {
+    return dateTime.toUtc().millisecondsSinceEpoch;
   }
 
   static DocumentStatus _statusFromString(String value) {
@@ -24,16 +25,22 @@ class SqliteDocumentRepository implements DocumentRepository {
     final status = _statusFromString(row['status'] as String);
     final confidenceScore = row['confidence_score'] as double?;
     final placeId = row['place_id'] as String?;
-    final createdSecs = row['created_at'] as int? ?? 0;
-    final updatedSecs = row['updated_at'] as int? ?? 0;
+    final createdMillis = row['created_at'] as int? ?? 0;
+    final updatedMillis = row['updated_at'] as int? ?? 0;
     return Document(
       id: id,
       title: title,
       filePath: filePath,
       status: status,
       confidenceScore: confidenceScore,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(createdSecs * 1000, isUtc: true),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedSecs * 1000, isUtc: true),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        createdMillis,
+        isUtc: true,
+      ),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+        updatedMillis,
+        isUtc: true,
+      ),
       placeId: placeId?.isEmpty == true ? null : placeId,
     );
   }
@@ -55,8 +62,8 @@ class SqliteDocumentRepository implements DocumentRepository {
           draft.status.name,
           draft.confidenceScore,
           draft.placeId,
-          _toUnixSeconds(draft.createdAt),
-          _toUnixSeconds(draft.updatedAt),
+          _toEpochMillis(draft.createdAt),
+          _toEpochMillis(draft.updatedAt),
         ],
       );
       return draft;
@@ -95,7 +102,7 @@ class SqliteDocumentRepository implements DocumentRepository {
           document.status.name,
           document.confidenceScore,
           document.placeId,
-          _toUnixSeconds(document.updatedAt),
+          _toEpochMillis(document.updatedAt),
           document.id,
         ],
       );
@@ -124,9 +131,9 @@ class SqliteDocumentRepository implements DocumentRepository {
       }
       if (createdBetween != null) {
         conditions.add('created_at >= ?');
-        params.add(_toUnixSeconds(createdBetween.start));
+        params.add(_toEpochMillis(createdBetween.start));
         conditions.add('created_at <= ?');
-        params.add(_toUnixSeconds(createdBetween.end));
+        params.add(_toEpochMillis(createdBetween.end));
       }
       final whereClause = conditions.isEmpty
           ? ''
