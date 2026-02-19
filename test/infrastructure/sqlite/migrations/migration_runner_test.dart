@@ -45,16 +45,18 @@ class Sqlite3MigrationDb implements MigrationDb {
 Future<List<Migration>> _loadTestMigrations() async {
   final initSql =
       await rootBundle.loadString('assets/sql/migrations/001_init_core_schema.sql');
+  final placesSql =
+      await rootBundle.loadString('assets/sql/migrations/002_add_places.sql');
   final documentsAndPagesSql =
-      await rootBundle.loadString('assets/sql/migrations/002_add_documents_and_pages.sql');
+      await rootBundle.loadString('assets/sql/migrations/003_add_documents_and_pages.sql');
   final summariesSql =
-      await rootBundle.loadString('assets/sql/migrations/003_add_summaries.sql');
+      await rootBundle.loadString('assets/sql/migrations/004_add_summaries.sql');
   final keywordsSql =
-      await rootBundle.loadString('assets/sql/migrations/004_add_keywords.sql');
+      await rootBundle.loadString('assets/sql/migrations/005_add_keywords.sql');
   final documentKeywordsSql = await rootBundle.loadString(
-      'assets/sql/migrations/005_add_document_keywords.sql');
+      'assets/sql/migrations/006_add_document_keywords.sql');
   final embeddingsSql =
-      await rootBundle.loadString('assets/sql/migrations/006_add_embeddings.sql');
+      await rootBundle.loadString('assets/sql/migrations/007_add_embeddings.sql');
 
   return <Migration>[
     Migration(
@@ -62,23 +64,27 @@ Future<List<Migration>> _loadTestMigrations() async {
       sql: initSql,
     ),
     Migration(
-      name: '002_add_documents_and_pages',
+      name: '002_add_places',
+      sql: placesSql,
+    ),
+    Migration(
+      name: '003_add_documents_and_pages',
       sql: documentsAndPagesSql,
     ),
     Migration(
-      name: '003_add_summaries',
+      name: '004_add_summaries',
       sql: summariesSql,
     ),
     Migration(
-      name: '004_add_keywords',
+      name: '005_add_keywords',
       sql: keywordsSql,
     ),
     Migration(
-      name: '005_add_document_keywords',
+      name: '006_add_document_keywords',
       sql: documentKeywordsSql,
     ),
     Migration(
-      name: '006_add_embeddings',
+      name: '007_add_embeddings',
       sql: embeddingsSql,
     ),
   ];

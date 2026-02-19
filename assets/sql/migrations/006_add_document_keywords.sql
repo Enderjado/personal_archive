@@ -1,7 +1,7 @@
--- 005_add_document_keywords.sql
+-- 006_add_document_keywords.sql
 -- Add document_keywords join table (many-to-many documents <-> keywords).
 
-CREATE TABLE document_keywords (
+CREATE TABLE IF NOT EXISTS document_keywords (
   id TEXT PRIMARY KEY,
   document_id TEXT NOT NULL,
   keyword_id TEXT NOT NULL,

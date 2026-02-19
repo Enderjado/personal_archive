@@ -1,7 +1,7 @@
--- 003_add_summaries.sql
+-- 004_add_summaries.sql
 -- Add summaries table (1:1 with documents).
 
-CREATE TABLE summaries (
+CREATE TABLE IF NOT EXISTS summaries (
   document_id TEXT PRIMARY KEY,
   text TEXT NOT NULL,
   model_version TEXT NOT NULL,
