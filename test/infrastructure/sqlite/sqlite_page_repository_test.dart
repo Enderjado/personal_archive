@@ -99,6 +99,56 @@ void main() {
         expect(page3.ocrConfidence, closeTo(0.7, 1e-9));
       },
     );
+
+    test(
+      'insertAll throws when inserting duplicate (document_id, page_number)',
+      () async {
+        const documentId = 'doc-for-duplicate-pages';
+
+        await db.execute(
+          '''
+          INSERT INTO documents (
+            id, title, file_path, status, confidence_score,
+            place_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            documentId,
+            'Doc Title',
+            '/path/to/doc.pdf',
+            DocumentStatus.imported.name,
+            null,
+            null,
+            0,
+            0,
+          ],
+        );
+
+        final pages = <Page>[
+          Page(
+            id: 'page-1',
+            documentId: documentId,
+            pageNumber: 1,
+            rawText: 'raw one',
+            processedText: 'processed one',
+            ocrConfidence: 0.9,
+          ),
+          Page(
+            id: 'page-duplicate',
+            documentId: documentId,
+            pageNumber: 1, // duplicate for same documentId
+            rawText: 'raw dup',
+            processedText: 'processed dup',
+            ocrConfidence: 0.7,
+          ),
+        ];
+
+        await expectLater(
+          () => repo.insertAll(pages),
+          throwsA(isA<StorageError>()),
+        );
+      },
+    );
   });
 }
 

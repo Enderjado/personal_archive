@@ -85,5 +85,26 @@ void main() {
       expect(found.updatedAt.toUtc().millisecondsSinceEpoch ~/ 1000,
           updated.updatedAt.toUtc().millisecondsSinceEpoch ~/ 1000);
     });
+
+    test('create throws StorageError when place_id foreign key is invalid',
+        () async {
+      final now = DateTime.now().toUtc();
+
+      final draft = Document(
+        id: 'doc-invalid-place',
+        title: 'Has invalid place',
+        filePath: '/invalid-place.pdf',
+        status: DocumentStatus.imported,
+        confidenceScore: 0.5,
+        createdAt: now,
+        updatedAt: now,
+        placeId: 'non-existent-place',
+      );
+
+      await expectLater(
+        () => repo.create(draft),
+        throwsA(isA<StorageError>()),
+      );
+    });
   });
 }
