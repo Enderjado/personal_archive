@@ -1,7 +1,7 @@
--- 004_add_keywords.sql
+-- 005_add_keywords.sql
 -- Add keywords table with unique (value, type) and indices.
 
-CREATE TABLE keywords (
+CREATE TABLE IF NOT EXISTS keywords (
   id TEXT PRIMARY KEY,
   value TEXT NOT NULL,
   type TEXT NOT NULL,
