@@ -1,14 +1,22 @@
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
     show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [SummaryRepository].
 ///
 /// Stores [Summary.createdAt] as Unix epoch milliseconds (INTEGER) in UTC.
 class SqliteSummaryRepository implements SummaryRepository {
-  SqliteSummaryRepository(this._db);
+  SqliteSummaryRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
+  final Duration _slowReadThreshold;
 
   static int _toEpochMillis(DateTime dateTime) {
     return dateTime.toUtc().millisecondsSinceEpoch;
@@ -40,21 +48,27 @@ class SqliteSummaryRepository implements SummaryRepository {
   @override
   Future<void> upsert(Summary summary) async {
     try {
-      await _db.execute(
-        '''
-        INSERT OR REPLACE INTO summaries (
-          document_id,
-          text,
-          model_version,
-          created_at
-        ) VALUES (?, ?, ?, ?)
-        ''',
-        [
-          summary.documentId,
-          summary.text,
-          summary.modelVersion,
-          _toEpochMillis(summary.createdAt),
-        ],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'upsert_summary',
+        table: 'summaries',
+        recordCount: 1,
+        action: () => _db.execute(
+          '''
+          INSERT OR REPLACE INTO summaries (
+            document_id,
+            text,
+            model_version,
+            created_at
+          ) VALUES (?, ?, ?, ?)
+          ''',
+          [
+            summary.documentId,
+            summary.text,
+            summary.modelVersion,
+            _toEpochMillis(summary.createdAt),
+          ],
+        ),
       );
     } catch (e) {
       _handleError(e);
@@ -64,9 +78,15 @@ class SqliteSummaryRepository implements SummaryRepository {
   @override
   Future<Summary?> findByDocumentId(String documentId) async {
     try {
-      final rows = await _db.query(
-        'SELECT * FROM summaries WHERE document_id = ?',
-        [documentId],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'find_summary_by_document_id',
+        table: 'summaries',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM summaries WHERE document_id = ?',
+          [documentId],
+        ),
       );
       if (rows.isEmpty) return null;
       return _rowToSummary(rows.single);

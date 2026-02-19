@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart';
 import 'package:personal_archive/infrastructure/sqlite/sqlite_summary_repository.dart';
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -71,6 +72,30 @@ Future<List<Migration>> _loadTestMigrations() async {
     Migration(name: '007_add_embeddings', sql: embeddingsSql),
     Migration(name: '008_add_documents_fts', sql: documentsFtsSql),
   ];
+}
+
+class _TestStorageLogger implements StorageLogger {
+  final List<String> writeEvents = <String>[];
+  final List<String> readEvents = <String>[];
+
+  @override
+  void logWrite({
+    required String operation,
+    required String table,
+    required int recordCount,
+    required Duration duration,
+  }) {
+    writeEvents.add(operation);
+  }
+
+  @override
+  void logRead({
+    required String operation,
+    required String table,
+    required Duration duration,
+  }) {
+    readEvents.add(operation);
+  }
 }
 
 void main() {
@@ -195,6 +220,53 @@ void main() {
 
       final found = await repo.findByDocumentId(documentId);
       expect(found, isNull);
+    });
+
+    test('works correctly when storage logging is enabled', () async {
+      const documentId = 'doc-with-logged-summary';
+      await db.execute(
+        '''
+        INSERT INTO documents (
+          id, title, file_path, status, confidence_score,
+          place_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+          documentId,
+          'Logged Doc',
+          '/path/to/logged.pdf',
+          DocumentStatus.imported.name,
+          null,
+          null,
+          0,
+          0,
+        ],
+      );
+
+      final logger = _TestStorageLogger();
+      final loggedRepo = SqliteSummaryRepository(
+        db,
+        logger: logger,
+        slowReadThreshold: Duration.zero,
+      );
+
+      final createdAt = DateTime.utc(2025, 2, 19, 13, 0, 0);
+      final summary = Summary(
+        documentId: documentId,
+        text: 'Summary text with logging enabled.',
+        modelVersion: 'qwen2.5-0.5b',
+        createdAt: createdAt,
+      );
+
+      await loggedRepo.upsert(summary);
+      final found = await loggedRepo.findByDocumentId(documentId);
+
+      expect(found, isNotNull);
+      expect(found!.text, 'Summary text with logging enabled.');
+
+      // Logging should not interfere with normal repository operation and should record events.
+      expect(logger.writeEvents, isNotEmpty);
+      expect(logger.readEvents, isNotEmpty);
     });
   });
 }

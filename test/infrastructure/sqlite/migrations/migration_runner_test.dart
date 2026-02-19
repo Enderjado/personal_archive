@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_archive/infrastructure/sqlite/documents_fts_sync.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart';
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 class Sqlite3MigrationDb implements MigrationDb {
@@ -97,9 +98,56 @@ Future<List<Migration>> _loadTestMigrations() async {
   ];
 }
 
+class _TestStorageLogger implements StorageLogger {
+  final List<String> writeEvents = <String>[];
+  final List<String> readEvents = <String>[];
+
+  @override
+  void logWrite({
+    required String operation,
+    required String table,
+    required int recordCount,
+    required Duration duration,
+  }) {
+    writeEvents.add(operation);
+  }
+
+  @override
+  void logRead({
+    required String operation,
+    required String table,
+    required Duration duration,
+  }) {
+    readEvents.add(operation);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   group('MigrationRunner', () {
+    test('runAll completes when storage logging is enabled', () async {
+      final rawDb = sqlite.sqlite3.openInMemory();
+      final db = Sqlite3MigrationDb(rawDb);
+
+      final migrations = <Migration>[
+        const Migration(
+          name: '001_init_core_schema',
+          sql: '',
+        ),
+      ];
+
+      final logger = _TestStorageLogger();
+      final runner = MigrationRunner(
+        db: db,
+        loadMigrations: () async => migrations,
+        logger: logger,
+      );
+
+      await runner.runAll();
+
+      // Logging should not interfere with successful migration execution.
+      expect(logger.writeEvents, isNotEmpty);
+    });
     test('enables foreign key enforcement', () async {
       final rawDb = sqlite.sqlite3.openInMemory();
       final db = Sqlite3MigrationDb(rawDb);

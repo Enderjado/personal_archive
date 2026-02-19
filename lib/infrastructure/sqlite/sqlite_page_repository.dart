@@ -1,12 +1,20 @@
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
     show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [PageRepository].
 class SqlitePageRepository implements PageRepository {
-  SqlitePageRepository(this._db);
+  SqlitePageRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
+  final Duration _slowReadThreshold;
 
   static Page _rowToPage(Map<String, Object?> row) {
     return Page(
@@ -25,30 +33,36 @@ class SqlitePageRepository implements PageRepository {
       return Future.value();
     }
 
-    return _db.transaction(() async {
-      for (final page in pages) {
-        await _db.execute(
-          '''
-          INSERT INTO pages (
-            id,
-            document_id,
-            page_number,
-            raw_text,
-            processed_text,
-            ocr_confidence
-          ) VALUES (?, ?, ?, ?, ?, ?)
-          ''',
-          [
-            page.id,
-            page.documentId,
-            page.pageNumber,
-            page.rawText,
-            page.processedText,
-            page.ocrConfidence,
-          ],
-        );
-      }
-    }).catchError((error, _) {
+    return timeWriteOperation<void>(
+      logger: _logger,
+      operation: 'insert_pages_bulk',
+      table: 'pages',
+      recordCount: pages.length,
+      action: () => _db.transaction(() async {
+        for (final page in pages) {
+          await _db.execute(
+            '''
+            INSERT INTO pages (
+              id,
+              document_id,
+              page_number,
+              raw_text,
+              processed_text,
+              ocr_confidence
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ''',
+            [
+              page.id,
+              page.documentId,
+              page.pageNumber,
+              page.rawText,
+              page.processedText,
+              page.ocrConfidence,
+            ],
+          );
+        }
+      }),
+    ).catchError((error, _) {
       throw StorageUnknownError(error);
     });
   }
@@ -56,9 +70,15 @@ class SqlitePageRepository implements PageRepository {
   @override
   Future<List<Page>> findByDocumentId(String documentId) async {
     try {
-      final rows = await _db.query(
-        'SELECT * FROM pages WHERE document_id = ? ORDER BY page_number',
-        [documentId],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'find_pages_by_document_id',
+        table: 'pages',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM pages WHERE document_id = ? ORDER BY page_number',
+          [documentId],
+        ),
       );
       if (rows.isEmpty) {
         return const [];

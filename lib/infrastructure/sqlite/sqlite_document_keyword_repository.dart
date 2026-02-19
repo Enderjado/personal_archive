@@ -1,14 +1,22 @@
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
     show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [DocumentKeywordRepository].
 ///
 /// [upsertForDocument] replaces all relations for a document (delete then insert).
 class SqliteDocumentKeywordRepository implements DocumentKeywordRepository {
-  SqliteDocumentKeywordRepository(this._db);
+  SqliteDocumentKeywordRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
+  final Duration _slowReadThreshold;
 
   static Keyword _rowToKeyword(Map<String, Object?> row) {
     final createdMillis = row['created_at'] as int;
@@ -40,29 +48,35 @@ class SqliteDocumentKeywordRepository implements DocumentKeywordRepository {
     List<DocumentKeywordRelation> relations,
   ) async {
     try {
-      await _db.transaction(() async {
-        await _db.execute(
-          'DELETE FROM document_keywords WHERE document_id = ?',
-          [documentId],
-        );
-        for (final r in relations) {
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'upsert_document_keywords_for_document',
+        table: 'document_keywords',
+        recordCount: relations.length,
+        action: () => _db.transaction(() async {
           await _db.execute(
-            '''
-            INSERT INTO document_keywords (
-              id, document_id, keyword_id, weight, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            ''',
-            [
-              r.id,
-              r.documentId,
-              r.keywordId,
-              r.weight,
-              r.confidence,
-              r.source,
-            ],
+            'DELETE FROM document_keywords WHERE document_id = ?',
+            [documentId],
           );
-        }
-      });
+          for (final r in relations) {
+            await _db.execute(
+              '''
+              INSERT INTO document_keywords (
+                id, document_id, keyword_id, weight, confidence, source
+              ) VALUES (?, ?, ?, ?, ?, ?)
+              ''',
+              [
+                r.id,
+                r.documentId,
+                r.keywordId,
+                r.weight,
+                r.confidence,
+                r.source,
+              ],
+            );
+          }
+        }),
+      );
     } catch (e) {
       _handleError(e);
     }
@@ -71,19 +85,25 @@ class SqliteDocumentKeywordRepository implements DocumentKeywordRepository {
   @override
   Future<List<Keyword>> listForDocument(String documentId) async {
     try {
-      final rows = await _db.query(
-        '''
-        SELECT
-          k.id AS id,
-          k.value AS value,
-          k.type AS type,
-          k.global_frequency AS global_frequency,
-          k.created_at AS created_at
-        FROM document_keywords dk
-        JOIN keywords k ON dk.keyword_id = k.id
-        WHERE dk.document_id = ?
-        ''',
-        [documentId],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'list_keywords_for_document',
+        table: 'document_keywords',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          '''
+          SELECT
+            k.id AS id,
+            k.value AS value,
+            k.type AS type,
+            k.global_frequency AS global_frequency,
+            k.created_at AS created_at
+          FROM document_keywords dk
+          JOIN keywords k ON dk.keyword_id = k.id
+          WHERE dk.document_id = ?
+          ''',
+          [documentId],
+        ),
       );
       return rows.map(_rowToKeyword).toList();
     } catch (e) {

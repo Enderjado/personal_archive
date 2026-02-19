@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
     show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [PlaceRepository].
@@ -13,9 +14,16 @@ import 'package:personal_archive/src/domain/domain.dart';
 /// Stores [Place.createdAt] and [Place.updatedAt] as Unix epoch milliseconds
 /// (INTEGER) in UTC.
 class SqlitePlaceRepository implements PlaceRepository {
-  SqlitePlaceRepository(this._db);
+  SqlitePlaceRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
+  final Duration _slowReadThreshold;
   static final Random _random = Random();
 
   /// Trim leading/trailing whitespace; names remain case-sensitive.
@@ -58,21 +66,33 @@ class SqlitePlaceRepository implements PlaceRepository {
   Future<Place> getOrCreate(String name) async {
     try {
       final normalized = _normalizeName(name);
-      final rows = await _db.query(
-        'SELECT * FROM places WHERE name = ?',
-        [normalized],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'get_or_create_place_lookup',
+        table: 'places',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM places WHERE name = ?',
+          [normalized],
+        ),
       );
       if (rows.isNotEmpty) return _rowToPlace(rows.single);
 
       final id = _generateId();
       final now = DateTime.now().toUtc();
       final ts = _toEpochMillis(now);
-      await _db.execute(
-        '''
-        INSERT INTO places (id, name, description, created_at, updated_at)
-        VALUES (?, ?, NULL, ?, ?)
-        ''',
-        [id, normalized, ts, ts],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'get_or_create_place_insert',
+        table: 'places',
+        recordCount: 1,
+        action: () => _db.execute(
+          '''
+          INSERT INTO places (id, name, description, created_at, updated_at)
+          VALUES (?, ?, NULL, ?, ?)
+          ''',
+          [id, normalized, ts, ts],
+        ),
       );
       return Place(
         id: id,
@@ -89,9 +109,15 @@ class SqlitePlaceRepository implements PlaceRepository {
   @override
   Future<List<Place>> listAll() async {
     try {
-      final rows = await _db.query(
-        'SELECT * FROM places ORDER BY name',
-        [],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'list_all_places',
+        table: 'places',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM places ORDER BY name',
+          [],
+        ),
       );
       return rows.map(_rowToPlace).toList();
     } catch (e) {
