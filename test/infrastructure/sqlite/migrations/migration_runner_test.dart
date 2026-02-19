@@ -51,6 +51,8 @@ Future<List<Migration>> _loadTestMigrations() async {
       await rootBundle.loadString('assets/sql/migrations/003_add_summaries.sql');
   final keywordsSql =
       await rootBundle.loadString('assets/sql/migrations/004_add_keywords.sql');
+  final documentKeywordsSql = await rootBundle.loadString(
+      'assets/sql/migrations/005_add_document_keywords.sql');
 
   return <Migration>[
     Migration(
@@ -68,6 +70,10 @@ Future<List<Migration>> _loadTestMigrations() async {
     Migration(
       name: '004_add_keywords',
       sql: keywordsSql,
+    ),
+    Migration(
+      name: '005_add_document_keywords',
+      sql: documentKeywordsSql,
     ),
   ];
 }
