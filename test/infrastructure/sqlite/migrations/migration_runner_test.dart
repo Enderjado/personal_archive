@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:personal_archive/infrastructure/sqlite/documents_fts_sync.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration.dart';
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -451,6 +452,77 @@ VALUES (?, ?, ?, ?)
       final embeddingsAfter =
           await db.query('SELECT * FROM embeddings WHERE document_id = ?', ['doc-emb']);
       expect(embeddingsAfter, isEmpty);
+    });
+
+    test('FTS sync and MATCH return expected document', () async {
+      final db = Sqlite3MigrationDb(sqlite.sqlite3.openInMemory());
+
+      final runner = MigrationRunner(
+        db: db,
+        loadMigrations: _loadTestMigrations,
+      );
+
+      await runner.runAll();
+
+      const now = 3000;
+
+      // Insert a document with title and pages so we can match on distinct terms.
+      await db.execute(
+        '''
+INSERT INTO documents (
+  id, title, file_path, status, confidence_score, place_id, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+''',
+        [
+          'doc-fts-1',
+          'FTS Integration Doc',
+          '/path/fts.pdf',
+          'completed',
+          null,
+          null,
+          now,
+          now,
+        ],
+      );
+
+      await db.execute(
+        '''
+INSERT INTO pages (
+  id, document_id, page_number, raw_text, processed_text, ocr_confidence
+) VALUES (?, ?, ?, ?, ?, ?)
+''',
+        ['page-fts-1', 'doc-fts-1', 1, 'raw one', 'mango banana', 0.9],
+      );
+      await db.execute(
+        '''
+INSERT INTO pages (
+  id, document_id, page_number, raw_text, processed_text, ocr_confidence
+) VALUES (?, ?, ?, ?, ?, ?)
+''',
+        ['page-fts-2', 'doc-fts-1', 2, 'raw two', 'gamma delta', 0.85],
+      );
+
+      await syncFtsForDocument(db, 'doc-fts-1');
+
+      final matchMango = await db.query(
+        'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+        ['mango'],
+      );
+      expect(matchMango, hasLength(1));
+      expect(matchMango.single['document_id'], 'doc-fts-1');
+
+      final matchGamma = await db.query(
+        'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+        ['gamma'],
+      );
+      expect(matchGamma, hasLength(1));
+      expect(matchGamma.single['document_id'], 'doc-fts-1');
+
+      final matchNonexistent = await db.query(
+        'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+        ['xyznonexistent'],
+      );
+      expect(matchNonexistent, isEmpty);
     });
   });
 }
