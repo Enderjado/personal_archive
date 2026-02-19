@@ -219,4 +219,5 @@ The following sections remain to be fully specified in follow-up commits:
 - `architecture.md` (layer boundaries and responsibilities)
 - `data_model.md` (entity semantics for `Document` and `Page`)
 - `storage_conventions.md` (SQLite and storage conventions)
+- `decisions/0012-file-storage-strategy-for-imported-pdfs.md` (ADR for managed PDF storage layout and cleanup)
 - `decisions/` (ADRs for file storage strategy and PDF metadata library choice)
