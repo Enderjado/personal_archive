@@ -144,6 +144,87 @@ void main() {
         expect(foundEmbedding.modelVersion, 'embed-model-v1');
       },
     );
+
+    test(
+      'documents can be filtered by status, place, and createdAt range',
+      () async {
+        final base = DateTime.utc(2025, 2, 19, 10, 0, 0);
+
+        // Two places.
+        final inbox = await ctx.placeRepository.getOrCreate('Inbox');
+        final archive = await ctx.placeRepository.getOrCreate('Archive');
+
+        // Seed documents with different status, place, and createdAt values.
+        final docs = <Document>[
+          Document(
+            id: 'filter-doc-1',
+            title: 'Imported in Inbox (old)',
+            filePath: '/docs/1.pdf',
+            status: DocumentStatus.imported,
+            createdAt: base.subtract(const Duration(days: 2)),
+            updatedAt: base.subtract(const Duration(days: 2)),
+            placeId: inbox.id,
+          ),
+          Document(
+            id: 'filter-doc-2',
+            title: 'Imported in Inbox (mid)',
+            filePath: '/docs/2.pdf',
+            status: DocumentStatus.imported,
+            createdAt: base,
+            updatedAt: base,
+            placeId: inbox.id,
+          ),
+          Document(
+            id: 'filter-doc-3',
+            title: 'Completed in Archive (mid)',
+            filePath: '/docs/3.pdf',
+            status: DocumentStatus.completed,
+            createdAt: base,
+            updatedAt: base,
+            placeId: archive.id,
+          ),
+          Document(
+            id: 'filter-doc-4',
+            title: 'Completed in Archive (future)',
+            filePath: '/docs/4.pdf',
+            status: DocumentStatus.completed,
+            createdAt: base.add(const Duration(days: 2)),
+            updatedAt: base.add(const Duration(days: 2)),
+            placeId: archive.id,
+          ),
+        ];
+
+        for (final d in docs) {
+          await ctx.documentRepository.create(d);
+        }
+
+        // 1) Filter by status only.
+        final importedOnly =
+            await ctx.documentRepository.list(status: DocumentStatus.imported);
+        final importedIds = importedOnly.map((d) => d.id).toSet();
+        expect(importedIds, {'filter-doc-1', 'filter-doc-2'});
+
+        // 2) Filter by place only.
+        final archiveOnly =
+            await ctx.documentRepository.list(placeId: archive.id);
+        final archiveIds = archiveOnly.map((d) => d.id).toSet();
+        expect(archiveIds, {'filter-doc-3', 'filter-doc-4'});
+
+        // 3) Combined filter: completed, at Archive, within a time window.
+        final range = DateTimeRange(
+          start: base.subtract(const Duration(hours: 1)),
+          end: base.add(const Duration(hours: 1)),
+        );
+        final completedArchiveMid = await ctx.documentRepository.list(
+          status: DocumentStatus.completed,
+          placeId: archive.id,
+          createdBetween: range,
+        );
+        final completedArchiveMidIds =
+            completedArchiveMid.map((d) => d.id).toList();
+        expect(completedArchiveMidIds, ['filter-doc-3']);
+      },
+    );
   });
 }
 
