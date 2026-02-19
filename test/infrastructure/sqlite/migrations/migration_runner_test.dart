@@ -47,6 +47,12 @@ Future<List<Migration>> _loadTestMigrations() async {
       await rootBundle.loadString('assets/sql/migrations/001_init_core_schema.sql');
   final documentsAndPagesSql =
       await rootBundle.loadString('assets/sql/migrations/002_add_documents_and_pages.sql');
+  final summariesSql =
+      await rootBundle.loadString('assets/sql/migrations/003_add_summaries.sql');
+  final keywordsSql =
+      await rootBundle.loadString('assets/sql/migrations/004_add_keywords.sql');
+  final documentKeywordsSql = await rootBundle.loadString(
+      'assets/sql/migrations/005_add_document_keywords.sql');
 
   return <Migration>[
     Migration(
@@ -56,6 +62,18 @@ Future<List<Migration>> _loadTestMigrations() async {
     Migration(
       name: '002_add_documents_and_pages',
       sql: documentsAndPagesSql,
+    ),
+    Migration(
+      name: '003_add_summaries',
+      sql: summariesSql,
+    ),
+    Migration(
+      name: '004_add_keywords',
+      sql: keywordsSql,
+    ),
+    Migration(
+      name: '005_add_document_keywords',
+      sql: documentKeywordsSql,
     ),
   ];
 }
@@ -243,6 +261,127 @@ INSERT INTO pages (
         ['doc-1'],
       );
       expect(remainingPages, isEmpty);
+    });
+
+    test('supports summaries, keywords, and document_keywords with referential integrity',
+        () async {
+      final db = Sqlite3MigrationDb(sqlite.sqlite3.openInMemory());
+
+      final runner = MigrationRunner(
+        db: db,
+        loadMigrations: _loadTestMigrations,
+      );
+
+      await runner.runAll();
+
+      const now = 1000;
+
+      // Insert a place and a document.
+      await db.execute(
+        '''
+INSERT INTO places (id, name, description, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?)
+''',
+        ['place-1', 'Archive', null, now, now],
+      );
+
+      await db.execute(
+        '''
+INSERT INTO documents (
+  id, title, file_path, status, confidence_score, place_id, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+''',
+        ['doc-1', 'Test Doc', '/path/doc.pdf', 'completed', 0.9, 'place-1', now, now],
+      );
+
+      // Insert summary (1:1 with document).
+      await db.execute(
+        '''
+INSERT INTO summaries (document_id, text, model_version, created_at)
+VALUES (?, ?, ?, ?)
+''',
+        ['doc-1', 'A short summary.', 'qwen2.5-0.5b', now],
+      );
+
+      // Insert keywords.
+      await db.execute(
+        '''
+INSERT INTO keywords (id, value, type, global_frequency, created_at)
+VALUES (?, ?, ?, ?, ?)
+''',
+        ['kw-1', 'tax', 'topic', 0, now],
+      );
+      await db.execute(
+        '''
+INSERT INTO keywords (id, value, type, global_frequency, created_at)
+VALUES (?, ?, ?, ?, ?)
+''',
+        ['kw-2', '2024', 'date', 0, now],
+      );
+
+      // Link document to keywords via document_keywords.
+      await db.execute(
+        '''
+INSERT INTO document_keywords (id, document_id, keyword_id, weight, confidence, source)
+VALUES (?, ?, ?, ?, ?, ?)
+''',
+        ['dk-1', 'doc-1', 'kw-1', 0.8, 0.9, 'llm_initial'],
+      );
+      await db.execute(
+        '''
+INSERT INTO document_keywords (id, document_id, keyword_id, weight, confidence, source)
+VALUES (?, ?, ?, ?, ?, ?)
+''',
+        ['dk-2', 'doc-1', 'kw-2', 0.5, 0.85, null],
+      );
+
+      // Query back and verify.
+      final summaries = await db.query(
+        'SELECT * FROM summaries WHERE document_id = ?',
+        ['doc-1'],
+      );
+      expect(summaries, hasLength(1));
+      expect(summaries.single['text'], 'A short summary.');
+      expect(summaries.single['model_version'], 'qwen2.5-0.5b');
+
+      final keywords = await db.query('SELECT * FROM keywords ORDER BY id', const []);
+      expect(keywords, hasLength(2));
+
+      final docKeywords = await db.query(
+        'SELECT * FROM document_keywords WHERE document_id = ? ORDER BY keyword_id',
+        ['doc-1'],
+      );
+      expect(docKeywords, hasLength(2));
+      expect(docKeywords.first['weight'], 0.8);
+      expect(docKeywords.first['confidence'], 0.9);
+
+      // Unique (document_id, keyword_id) rejects duplicate.
+      await expectLater(
+        db.execute(
+          '''
+INSERT INTO document_keywords (id, document_id, keyword_id, weight, confidence)
+VALUES (?, ?, ?, ?, ?)
+''',
+          ['dk-dup', 'doc-1', 'kw-1', 0.1, 0.1],
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+
+      // Deleting document cascades to summaries and document_keywords.
+      await db.execute('DELETE FROM documents WHERE id = ?', ['doc-1']);
+
+      final summariesAfter = await db.query('SELECT * FROM summaries', const []);
+      expect(summariesAfter, isEmpty);
+
+      final docKeywordsAfter = await db.query(
+        'SELECT * FROM document_keywords WHERE document_id = ?',
+        ['doc-1'],
+      );
+      expect(docKeywordsAfter, isEmpty);
+
+      // Keywords remain (reusable).
+      final keywordsAfter = await db.query('SELECT * FROM keywords', const []);
+      expect(keywordsAfter, hasLength(2));
     });
   });
 }
