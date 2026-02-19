@@ -205,11 +205,18 @@ Responsibilities:
 
 ---
 
-## Phase 2 Sections (Detailed in Subsequent Commits)
+## Cross-Link and Consistency Status
 
-The following sections remain to be fully specified in follow-up commits:
+This public Phase 2 specification is cross-linked with:
 
-1. Cross-links to ADRs for discrete architecture decisions.
+- `pipeline.md` (high-level import stage context),
+- `architecture.md` (layer boundaries and pipeline orchestration placement),
+- `data_model.md` (Document/Page semantics used during import),
+- `storage_conventions.md` (SQLite conventions and FTS sync boundary),
+- `decisions/0012-file-storage-strategy-for-imported-pdfs.md`,
+- `decisions/0013-pdf-library-choice-for-metadata.md`.
+
+Consistency note: no intentional deviation from the private preparation specification is introduced in this public Phase 2 documentation set. If implementation later changes naming or behavior, this document and linked ADRs must be updated and treated as source of truth.
 
 ---
 
@@ -220,4 +227,5 @@ The following sections remain to be fully specified in follow-up commits:
 - `data_model.md` (entity semantics for `Document` and `Page`)
 - `storage_conventions.md` (SQLite and storage conventions)
 - `decisions/0012-file-storage-strategy-for-imported-pdfs.md` (ADR for managed PDF storage layout and cleanup)
+- `decisions/0013-pdf-library-choice-for-metadata.md` (ADR for page-count metadata library selection)
 - `decisions/` (ADRs for file storage strategy and PDF metadata library choice)

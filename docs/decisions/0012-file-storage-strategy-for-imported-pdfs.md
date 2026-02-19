@@ -10,6 +10,8 @@ Phase 2 requires a deterministic and safe way to persist imported PDFs in local 
 
 The public implementation contract for Phase 2 import is defined in `docs/pdf_import_pipeline.md`. Global storage and persistence conventions are defined in `docs/storage_conventions.md`.
 
+Related decision: PDF metadata library selection is documented in `docs/decisions/0013-pdf-library-choice-for-metadata.md`.
+
 ## Decision
 
 - Imported PDFs are stored under a configurable application-managed storage root.

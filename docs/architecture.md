@@ -124,3 +124,9 @@ Hardcoding is avoided entirely, so the system can adapt and evolve.
 
 All major design choices are documented in Architecture Decision Records. Every step, every trade-off, every limitation is noted. This makes the system transparent and maintainable, and shows the reasoning behind every decision.
 
+For Phase 2 PDF import implementation details and decisions, see:
+
+* `pdf_import_pipeline.md`
+* `decisions/0012-file-storage-strategy-for-imported-pdfs.md`
+* `decisions/0013-pdf-library-choice-for-metadata.md`
+
