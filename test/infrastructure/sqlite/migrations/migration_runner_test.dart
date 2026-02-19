@@ -47,6 +47,8 @@ Future<List<Migration>> _loadTestMigrations() async {
       await rootBundle.loadString('assets/sql/migrations/001_init_core_schema.sql');
   final documentsAndPagesSql =
       await rootBundle.loadString('assets/sql/migrations/002_add_documents_and_pages.sql');
+  final summariesSql =
+      await rootBundle.loadString('assets/sql/migrations/003_add_summaries.sql');
 
   return <Migration>[
     Migration(
@@ -56,6 +58,10 @@ Future<List<Migration>> _loadTestMigrations() async {
     Migration(
       name: '002_add_documents_and_pages',
       sql: documentsAndPagesSql,
+    ),
+    Migration(
+      name: '003_add_summaries',
+      sql: summariesSql,
     ),
   ];
 }
