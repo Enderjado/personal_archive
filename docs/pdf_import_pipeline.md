@@ -131,13 +131,85 @@ Each validation error includes:
 
 ---
 
+## Import Pipeline Sequence
+
+Phase 2 import follows this ordered flow:
+
+1. **Validate input**
+   - Apply the validation contract against the source path.
+   - Abort immediately on validation error.
+2. **Copy to managed storage**
+   - Generate `documentId`.
+   - Derive managed target path `<storageRoot>/<documentId>.pdf`.
+   - Copy source PDF to managed storage.
+3. **Create document record**
+   - Persist `Document` with status `imported` and managed `filePath`.
+4. **Read PDF metadata**
+   - Read page count from the managed PDF.
+5. **Create page records**
+   - Create ordered `Page` rows (`1..pageCount`) linked to `documentId`.
+6. **Sync search index state (FTS boundary)**
+   - Trigger required import-time synchronization so the storage/search layer stays internally consistent with created entities.
+
+### Sequence Guarantees
+
+- Step order is strict and deterministic.
+- A later step must not run when a prior step fails.
+- On failure after file copy, rollback cleanup removes copied managed files and prevents half-imported persistence.
+
+---
+
+## Interface Responsibilities
+
+Phase 2 separates orchestration from file I/O, PDF metadata access, and persistence.
+
+### `DocumentPipeline`
+
+Orchestrates the full import use case and owns step ordering, error mapping, and cleanup coordination.
+
+Responsibilities:
+
+- call validation,
+- coordinate managed-file copy,
+- persist `Document` and `Page` entities via repositories,
+- trigger required import-time sync boundaries,
+- enforce rollback/cleanup semantics.
+
+`DocumentPipeline` does not implement low-level file operations or PDF parsing directly.
+
+### `DocumentFileStorage`
+
+Abstracts managed file operations for imported PDFs.
+
+Responsibilities:
+
+- resolve storage root,
+- derive deterministic managed path from `documentId`,
+- copy source files into managed storage,
+- delete managed files during rollback/cleanup.
+
+### `PdfMetadataReader`
+
+Abstracts PDF metadata access used during import.
+
+Responsibilities:
+
+- read page-count metadata from a managed PDF path,
+- surface typed metadata/read failures to the pipeline.
+
+### Repository Collaboration Boundaries
+
+- `DocumentPipeline` writes `Document` through `DocumentRepository`.
+- `DocumentPipeline` writes ordered `Page` rows through `PageRepository`.
+- Repository interfaces remain persistence-focused; orchestration logic stays in `DocumentPipeline`.
+
+---
+
 ## Phase 2 Sections (Detailed in Subsequent Commits)
 
 The following sections remain to be fully specified in follow-up commits:
 
-1. Ordered pipeline sequence and side-effect boundaries.
-2. Interface contracts (`DocumentPipeline`, `DocumentFileStorage`, `PdfMetadataReader`).
-3. Cross-links to ADRs for discrete architecture decisions.
+1. Cross-links to ADRs for discrete architecture decisions.
 
 ---
 
