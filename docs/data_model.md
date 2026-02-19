@@ -29,6 +29,7 @@ Represents a full imported document, either PDF or other supported formats.
 
 * Immutable ID ensures references remain consistent.
 * Status changes are controlled events in the pipeline.
+* In Phase 2 import, `filePath` points to the managed storage path (see `pdf_import_pipeline.md` and ADR `decisions/0012-file-storage-strategy-for-imported-pdfs.md`).
 
 ---
 
@@ -48,6 +49,7 @@ Represents a single page extracted from a document.
 
 * Pages are immutable after creation; only `rawText` and `processedText` are updated during pipeline execution.
 * Supports per-page confidence scores if needed for logging.
+* In Phase 2 import, one `Page` row is created per PDF page with `pageNumber` set and text fields initially empty.
 
 ---
 
@@ -183,3 +185,5 @@ Full-text document search in Phase 1 is implemented via a separate SQLite FTS5 v
 ---
 
 This data model ensures that every document processed is fully traceable, searchable, and structured for maximum clarity. It forms the foundation for the pipelines, storage, and search systems, and ensures the system remains robust and maintainable.
+
+For Phase 2 import-specific behavior (validation, file storage, pipeline steps, and interface boundaries), see `pdf_import_pipeline.md`.

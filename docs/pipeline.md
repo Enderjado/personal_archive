@@ -12,6 +12,8 @@ Every document flows through a deterministic pipeline that ensures:
 * Observability: Every step is logged, with metrics and error handling.
 * Isolation: Each stage is independently testable and replaceable.
 
+For Phase 2 PDF import implementation details (objectives, scope, storage, validation, interfaces, and cleanup semantics), see `pdf_import_pipeline.md`.
+
 The pipeline follows this sequence:
 
 
@@ -42,6 +44,7 @@ The pipeline follows this sequence:
 **Notes:**
 
 * At this stage, the document is known to the system but has not been processed.
+* Public implementation detail for Phase 2 lives in `pdf_import_pipeline.md`.
 
 ---
 

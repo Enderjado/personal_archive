@@ -4,6 +4,8 @@ This document defines the **global SQLite schema conventions** for the project. 
 
 All schema design, migrations, and repository implementations must follow these rules.
 
+Scope note: this document defines **SQLite** conventions only. Phase 2 filesystem storage for imported PDFs (storage root, naming/layout, copy policy, cleanup behavior) is defined in `docs/pdf_import_pipeline.md` and ADR `docs/decisions/0012-file-storage-strategy-for-imported-pdfs.md`. PDF metadata library choice is documented in ADR `docs/decisions/0013-pdf-library-choice-for-metadata.md`.
+
 ---
 
 ### 1. ID Strategy
