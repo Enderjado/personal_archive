@@ -109,6 +109,9 @@ The rationale for non‑obvious choices should be captured either here or in an 
   - Filenames start with a zero‑padded numeric prefix followed by a descriptive name, e.g.:
     - `001_init_core_schema.sql`
     - `002_add_documents_and_pages.sql`
+    - `003_add_summaries.sql`
+    - `004_add_keywords.sql`
+    - `005_add_document_keywords.sql`
 - **Ordering & idempotence**
   - Migrations are applied in **lexicographical filename order**, which matches numeric prefix order.
   - Each migration is applied at most once; applied migrations are recorded in `schema_migrations` by `name`.
@@ -121,4 +124,12 @@ The rationale for non‑obvious choices should be captured either here or in an 
     - `documents`: `id`, `title`, `file_path`, `status`, `confidence_score`, `place_id` (FK → `places.id` ON DELETE RESTRICT), `created_at`, `updated_at`.
     - `pages`: `id`, `document_id` (FK → `documents.id` ON DELETE CASCADE), `page_number`, `raw_text`, `processed_text`, `ocr_confidence`; UNIQUE `(document_id, page_number)`.
     - Indices: `idx_documents_status`, `idx_documents_place_id`, `idx_documents_created_at_status`, `idx_pages_document_id`.
+  - **`003_add_summaries.sql`** – Creates:
+    - `summaries`: `document_id` (PK, FK → `documents.id` ON DELETE CASCADE), `text`, `model_version`, `created_at` (1:1 with documents).
+  - **`004_add_keywords.sql`** – Creates:
+    - `keywords`: `id`, `value`, `type`, `global_frequency` (DEFAULT 0), `created_at`; UNIQUE `(value, type)`.
+    - Indices: `idx_keywords_value`, `idx_keywords_type`.
+  - **`005_add_document_keywords.sql`** – Creates:
+    - `document_keywords`: `id`, `document_id` (FK → `documents.id` ON DELETE CASCADE), `keyword_id` (FK → `keywords.id` ON DELETE CASCADE), `weight`, `confidence`, `source` (optional); UNIQUE `(document_id, keyword_id)`.
+    - Indices: `idx_document_keywords_document_id`, `idx_document_keywords_keyword_id`.
 
