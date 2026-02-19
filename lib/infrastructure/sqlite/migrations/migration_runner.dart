@@ -1,3 +1,5 @@
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
+
 import 'migration.dart';
 import 'schema_migrations_table.dart';
 
@@ -24,10 +26,14 @@ class MigrationRunner {
   MigrationRunner({
     required this.db,
     required this.loadMigrations,
-  });
+    StorageLogger logger = const NoOpStorageLogger(),
+  }) : _logger = logger;
 
   /// Database adapter used by the runner.
   final MigrationDb db;
+
+  /// Logger used for recording migration lifecycle events.
+  final StorageLogger _logger;
 
   /// Function that returns the full set of known migrations.
   ///
@@ -76,8 +82,52 @@ class MigrationRunner {
           continue;
         }
 
-        await db.execute(migration.sql, const []);
-        await _recordAppliedMigration(migration.name);
+        final stopwatch = Stopwatch()..start();
+
+        _logger.logWrite(
+          operation: 'migration_start:${migration.name}',
+          table: 'migrations',
+          recordCount: 0,
+          duration: Duration.zero,
+        );
+
+        try {
+          await timeWriteOperation<void>(
+            logger: _logger,
+            operation: 'apply_migration_sql:${migration.name}',
+            table: 'migrations',
+            recordCount: 1,
+            action: () => db.execute(migration.sql, const []),
+          );
+
+          await timeWriteOperation<void>(
+            logger: _logger,
+            operation: 'record_applied_migration:${migration.name}',
+            table: 'schema_migrations',
+            recordCount: 1,
+            action: () => _recordAppliedMigration(migration.name),
+          );
+
+          stopwatch.stop();
+
+          _logger.logWrite(
+            operation: 'migration_success:${migration.name}',
+            table: 'migrations',
+            recordCount: 1,
+            duration: stopwatch.elapsed,
+          );
+        } catch (e) {
+          stopwatch.stop();
+
+          _logger.logWrite(
+            operation: 'migration_error:${migration.name}',
+            table: 'migrations',
+            recordCount: 0,
+            duration: stopwatch.elapsed,
+          );
+
+          rethrow;
+        }
       }
     });
   }
