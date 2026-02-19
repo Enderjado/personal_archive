@@ -81,7 +81,28 @@ class SqliteDocumentRepository implements DocumentRepository {
 
   @override
   Future<Document?> update(Document document) async {
-    throw UnimplementedError('update will be added in a later commit');
+    try {
+      await _db.execute(
+        '''
+        UPDATE documents SET
+          title = ?, file_path = ?, status = ?, confidence_score = ?,
+          place_id = ?, updated_at = ?
+        WHERE id = ?
+        ''',
+        [
+          document.title,
+          document.filePath,
+          document.status.name,
+          document.confidenceScore,
+          document.placeId,
+          _toUnixSeconds(document.updatedAt),
+          document.id,
+        ],
+      );
+      return document;
+    } catch (e) {
+      throw StorageUnknownError(e);
+    }
   }
 
   @override
