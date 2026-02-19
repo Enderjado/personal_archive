@@ -111,6 +111,33 @@ class SqliteDocumentRepository implements DocumentRepository {
     String? placeId,
     DateTimeRange? createdBetween,
   }) async {
-    throw UnimplementedError('list will be added in a later commit');
+    try {
+      final conditions = <String>[];
+      final params = <Object?>[];
+      if (status != null) {
+        conditions.add('status = ?');
+        params.add(status.name);
+      }
+      if (placeId != null) {
+        conditions.add('place_id = ?');
+        params.add(placeId);
+      }
+      if (createdBetween != null) {
+        conditions.add('created_at >= ?');
+        params.add(_toUnixSeconds(createdBetween.start));
+        conditions.add('created_at <= ?');
+        params.add(_toUnixSeconds(createdBetween.end));
+      }
+      final whereClause = conditions.isEmpty
+          ? ''
+          : 'WHERE ${conditions.join(' AND ')}';
+      final rows = await _db.query(
+        'SELECT * FROM documents $whereClause ORDER BY created_at DESC',
+        params,
+      );
+      return rows.map(_rowToDocument).toList();
+    } catch (e) {
+      throw StorageUnknownError(e);
+    }
   }
 }
