@@ -10,10 +10,13 @@ class SqliteSummaryRepository implements SummaryRepository {
   SqliteSummaryRepository(
     this._db, {
     StorageLogger logger = const NoOpStorageLogger(),
-  }) : _logger = logger;
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
   final StorageLogger _logger;
+  final Duration _slowReadThreshold;
 
   static int _toEpochMillis(DateTime dateTime) {
     return dateTime.toUtc().millisecondsSinceEpoch;
@@ -75,9 +78,15 @@ class SqliteSummaryRepository implements SummaryRepository {
   @override
   Future<Summary?> findByDocumentId(String documentId) async {
     try {
-      final rows = await _db.query(
-        'SELECT * FROM summaries WHERE document_id = ?',
-        [documentId],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'find_summary_by_document_id',
+        table: 'summaries',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM summaries WHERE document_id = ?',
+          [documentId],
+        ),
       );
       if (rows.isEmpty) return null;
       return _rowToSummary(rows.single);

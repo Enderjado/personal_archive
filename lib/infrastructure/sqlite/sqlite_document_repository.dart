@@ -11,10 +11,13 @@ class SqliteDocumentRepository implements DocumentRepository {
   SqliteDocumentRepository(
     this._db, {
     StorageLogger logger = const NoOpStorageLogger(),
-  }) : _logger = logger;
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
   final StorageLogger _logger;
+  final Duration _slowReadThreshold;
 
   static int _toEpochMillis(DateTime dateTime) {
     return dateTime.toUtc().millisecondsSinceEpoch;
@@ -87,9 +90,15 @@ class SqliteDocumentRepository implements DocumentRepository {
   @override
   Future<Document?> findById(String id) async {
     try {
-      final rows = await _db.query(
-        'SELECT * FROM documents WHERE id = ?',
-        [id],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'find_document_by_id',
+        table: 'documents',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM documents WHERE id = ?',
+          [id],
+        ),
       );
       if (rows.isEmpty) return null;
       return _rowToDocument(rows.single);
@@ -156,9 +165,15 @@ class SqliteDocumentRepository implements DocumentRepository {
       final whereClause = conditions.isEmpty
           ? ''
           : 'WHERE ${conditions.join(' AND ')}';
-      final rows = await _db.query(
-        'SELECT * FROM documents $whereClause ORDER BY created_at DESC',
-        params,
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'list_documents',
+        table: 'documents',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM documents $whereClause ORDER BY created_at DESC',
+          params,
+        ),
       );
       return rows.map(_rowToDocument).toList();
     } catch (e) {

@@ -8,10 +8,13 @@ class SqlitePageRepository implements PageRepository {
   SqlitePageRepository(
     this._db, {
     StorageLogger logger = const NoOpStorageLogger(),
-  }) : _logger = logger;
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
   final StorageLogger _logger;
+  final Duration _slowReadThreshold;
 
   static Page _rowToPage(Map<String, Object?> row) {
     return Page(
@@ -67,9 +70,15 @@ class SqlitePageRepository implements PageRepository {
   @override
   Future<List<Page>> findByDocumentId(String documentId) async {
     try {
-      final rows = await _db.query(
-        'SELECT * FROM pages WHERE document_id = ? ORDER BY page_number',
-        [documentId],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'find_pages_by_document_id',
+        table: 'pages',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM pages WHERE document_id = ? ORDER BY page_number',
+          [documentId],
+        ),
       );
       if (rows.isEmpty) {
         return const [];

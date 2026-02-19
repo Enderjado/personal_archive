@@ -92,6 +92,7 @@ Future<T> timeReadOperation<T>({
   required StorageLogger logger,
   required String operation,
   required String table,
+  Duration slowLogThreshold = const Duration(milliseconds: 75),
   required _AsyncOperation<T> action,
 }) async {
   final stopwatch = Stopwatch()..start();
@@ -99,11 +100,14 @@ Future<T> timeReadOperation<T>({
     return await action();
   } finally {
     stopwatch.stop();
-    logger.logRead(
-      operation: operation,
-      table: table,
-      duration: stopwatch.elapsed,
-    );
+    final duration = stopwatch.elapsed;
+    if (duration >= slowLogThreshold) {
+      logger.logRead(
+        operation: operation,
+        table: table,
+        duration: duration,
+      );
+    }
   }
 }
 

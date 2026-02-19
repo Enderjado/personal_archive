@@ -14,10 +14,13 @@ class SqliteEmbeddingRepository implements EmbeddingRepository {
   SqliteEmbeddingRepository(
     this._db, {
     StorageLogger logger = const NoOpStorageLogger(),
-  }) : _logger = logger;
+    Duration slowReadThreshold = const Duration(milliseconds: 75),
+  })  : _logger = logger,
+        _slowReadThreshold = slowReadThreshold;
 
   final MigrationDb _db;
   final StorageLogger _logger;
+  final Duration _slowReadThreshold;
 
   static int _toEpochMillis(DateTime dateTime) {
     return dateTime.toUtc().millisecondsSinceEpoch;
@@ -94,9 +97,15 @@ class SqliteEmbeddingRepository implements EmbeddingRepository {
   @override
   Future<Embedding?> findByDocumentId(String documentId) async {
     try {
-      final rows = await _db.query(
-        'SELECT * FROM embeddings WHERE document_id = ?',
-        [documentId],
+      final rows = await timeReadOperation<List<Map<String, Object?>>>(
+        logger: _logger,
+        operation: 'find_embedding_by_document_id',
+        table: 'embeddings',
+        slowLogThreshold: _slowReadThreshold,
+        action: () => _db.query(
+          'SELECT * FROM embeddings WHERE document_id = ?',
+          [documentId],
+        ),
       );
       if (rows.isEmpty) return null;
       return _rowToEmbedding(rows.single);
