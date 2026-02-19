@@ -82,14 +82,62 @@ Imported PDFs are persisted in application-managed storage so document processin
 
 ---
 
+## Validation Contract
+
+Validation is a strict precondition stage for import. No managed-file copy and no database write is allowed before validation succeeds.
+
+### Validation Order
+
+Validation executes in this order:
+
+1. **Exists**: source path resolves to an existing file.
+2. **Readable**: source file can be opened for read.
+3. **PDF type**: file is recognized as PDF (extension check is not sufficient on its own).
+4. **File size limit**: file size must be less than or equal to configured max import size.
+5. **Page count limit**: detected page count must be less than or equal to configured max pages.
+
+Validation stops on first failure and returns a typed validation result.
+
+### Default Limits
+
+- `maxImportFileSizeBytes`: configurable, default **50 MiB**.
+- `maxImportPageCount`: configurable, default **500 pages**.
+
+These defaults are safety baselines and may be tuned via application configuration without changing the pipeline contract.
+
+### Validation Error Representation
+
+Validation failures are represented as domain-level validation errors, distinct from storage/runtime failures.
+
+Minimum error categories:
+
+- `sourceNotFound`
+- `sourceNotReadable`
+- `unsupportedFileType`
+- `fileTooLarge`
+- `pageCountExceeded`
+
+Each validation error includes:
+
+- stable error code,
+- human-readable message suitable for UI translation mapping,
+- optional structured metadata (for example: actual file size, configured limit, detected page count).
+
+### Contract Guarantees
+
+- Validation failures produce no side effects in managed storage or persistence.
+- Validation error handling is deterministic and testable in isolation.
+- Validation and limit values are configuration-driven, with documented defaults.
+
+---
+
 ## Phase 2 Sections (Detailed in Subsequent Commits)
 
 The following sections remain to be fully specified in follow-up commits:
 
-1. Validation rules and error representation.
-2. Ordered pipeline sequence and side-effect boundaries.
-3. Interface contracts (`DocumentPipeline`, `DocumentFileStorage`, `PdfMetadataReader`).
-4. Cross-links to ADRs for discrete architecture decisions.
+1. Ordered pipeline sequence and side-effect boundaries.
+2. Interface contracts (`DocumentPipeline`, `DocumentFileStorage`, `PdfMetadataReader`).
+3. Cross-links to ADRs for discrete architecture decisions.
 
 ---
 
