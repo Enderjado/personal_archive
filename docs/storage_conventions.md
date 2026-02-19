@@ -137,6 +137,10 @@ The rationale for non‑obvious choices should be captured either here or in an 
     - Indices: `idx_document_keywords_document_id`, `idx_document_keywords_keyword_id`.
   - **`007_add_embeddings.sql`** – Creates:
     - `embeddings`: `document_id` (PK, FK → `documents.id` ON DELETE CASCADE), `vector` (TEXT, JSON array of floats), `model_version`, `created_at` (optional; 1:1 with documents).
+  - **`008_add_documents_fts.sql`** – Creates:
+    - `documents_fts`: FTS5 virtual table with `document_id` (UNINDEXED identifier) and `content` (aggregated text from titles, pages, summaries, and keywords) used for full-text search.
+
+In Phase 1, the SQLite-backed repository implementations under `lib/infrastructure/sqlite/` (`SqliteDocumentRepository`, `SqlitePageRepository`, `SqliteSummaryRepository`, `SqliteKeywordRepository`, `SqliteDocumentKeywordRepository`, `SqliteEmbeddingRepository`, `SqlitePlaceRepository`) map the domain repositories onto these tables, and `MigrationRunner`/`MigrationDb` coordinate applying the migration SQL at startup.
 
 ---
 
