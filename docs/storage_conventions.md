@@ -138,3 +138,27 @@ The rationale for non‑obvious choices should be captured either here or in an 
   - **`007_add_embeddings.sql`** – Creates:
     - `embeddings`: `document_id` (PK, FK → `documents.id` ON DELETE CASCADE), `vector` (TEXT, JSON array of floats), `model_version`, `created_at` (optional; 1:1 with documents).
 
+---
+
+### 7. Full-Text Search (FTS5)
+
+Full-text search uses SQLite FTS5. The design is documented in ADR `docs/decisions/0011-sqlite-fts5-design.md`; this section is the **canonical reference** for schema and behaviour.
+
+- **Indexing level**
+  - **Document-level**: one FTS row per document. Page-level indexing is not used in Phase 1. Rationale: matches “find documents matching this text”, keeps schema and sync simple; per-page search can be added later if needed.
+
+- **Schema**
+  - One FTS5 virtual table **`documents_fts`**, one row per document. Indexed content comes from:
+    - **Document title** – `documents.title`
+    - **Processed page text** – concatenation of `pages.processed_text` (or `pages.raw_text`) for the document
+    - **Summary text** – `summaries.text` (if present)
+    - **Keyword values** – `keywords.value` via `document_keywords`
+  - Content is combined into one or more FTS columns so a single query can match across all of the above. The FTS table stores a document identifier so results can be joined to `documents` and filtered by place, date, status, etc. Exact column layout is defined in the migration that creates the FTS table.
+
+- **Synchronization**
+  - **Application-driven**: the application updates the FTS table when documents, pages, summaries, or document_keywords change (no SQLite triggers). This keeps behaviour explicit and testable. Every code path that mutates indexed data must call the update logic.
+
+- **Example queries**
+  - **Search by text and filter by place**: FTS match on the user query, then join to `documents` and filter by `place_id` (or place name via `places`).
+  - **Search by text and restrict by date**: FTS match plus join to `documents` and filter on `created_at` (or another date column) to narrow results to a time window.
+
