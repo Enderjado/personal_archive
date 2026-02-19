@@ -135,6 +135,145 @@ void main() {
         expect(ids, ['fts-doc-alpha']);
       },
     );
+
+    test(
+      'non-matching FTS5 query returns no rows',
+      () async {
+        final now = DateTime.utc(2025, 2, 20, 13, 0, 0);
+
+        final doc = Document(
+          id: 'fts-doc-gamma',
+          title: 'Gamma Document',
+          filePath: '/fts/gamma.pdf',
+          status: DocumentStatus.completed,
+          confidenceScore: 0.9,
+          createdAt: now,
+          updatedAt: now,
+          placeId: null,
+        );
+
+        await ctx.documentRepository.create(doc);
+
+        await ctx.pageRepository.insertAll([
+          Page(
+            id: 'fts-page-gamma-1',
+            documentId: doc.id,
+            pageNumber: 1,
+            rawText: 'gamma raw text',
+            processedText: 'gamma visible keyword gammanet',
+            ocrConfidence: 0.95,
+          ),
+        ]);
+
+        final summary = Summary(
+          documentId: doc.id,
+          text: 'Summary mentioning gammanet only.',
+          modelVersion: 'fts-test-model',
+          createdAt: now,
+        );
+        await ctx.summaryRepository.upsert(summary);
+
+        final keyword = await ctx.keywordRepository.getOrCreate(
+          'gammanet',
+          'topic',
+        );
+
+        await ctx.documentKeywordRepository.upsertForDocument(
+          doc.id,
+          [
+            DocumentKeywordRelation(
+              id: 'fts-dk-gamma-1',
+              documentId: doc.id,
+              keywordId: keyword.id,
+              weight: 0.9,
+              confidence: 0.9,
+              source: 'fts_test',
+            ),
+          ],
+        );
+
+        await syncFtsForDocument(ctx.db, doc.id);
+
+        final rows = await ctx.db.query(
+          'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+          ['nonexistentterm'],
+        );
+
+        expect(rows, isEmpty);
+      },
+    );
+
+    test(
+      'updating summary content and resyncing FTS updates search results',
+      () async {
+        final now = DateTime.utc(2025, 2, 20, 14, 0, 0);
+
+        final doc = Document(
+          id: 'fts-doc-delta',
+          title: 'Delta Document',
+          filePath: '/fts/delta.pdf',
+          status: DocumentStatus.completed,
+          confidenceScore: 0.9,
+          createdAt: now,
+          updatedAt: now,
+          placeId: null,
+        );
+
+        await ctx.documentRepository.create(doc);
+
+        // Initial summary mentioning "oldterm" only.
+        final initialSummary = Summary(
+          documentId: doc.id,
+          text: 'Delta summary with oldterm only.',
+          modelVersion: 'fts-test-model',
+          createdAt: now,
+        );
+        await ctx.summaryRepository.upsert(initialSummary);
+
+        await syncFtsForDocument(ctx.db, doc.id);
+
+        var rows = await ctx.db.query(
+          'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+          ['oldterm'],
+        );
+        expect(
+          rows.map((row) => row['document_id'] as String).toList(),
+          ['fts-doc-delta'],
+        );
+
+        rows = await ctx.db.query(
+          'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+          ['newterm'],
+        );
+        expect(rows, isEmpty);
+
+        // Update summary content to remove "oldterm" and include "newterm".
+        final updatedSummary = Summary(
+          documentId: doc.id,
+          text: 'Delta summary with newterm instead.',
+          modelVersion: 'fts-test-model',
+          createdAt: now,
+        );
+        await ctx.summaryRepository.upsert(updatedSummary);
+
+        await syncFtsForDocument(ctx.db, doc.id);
+
+        rows = await ctx.db.query(
+          'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+          ['oldterm'],
+        );
+        expect(rows, isEmpty);
+
+        rows = await ctx.db.query(
+          'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+          ['newterm'],
+        );
+        expect(
+          rows.map((row) => row['document_id'] as String).toList(),
+          ['fts-doc-delta'],
+        );
+      },
+    );
   });
 }
 
