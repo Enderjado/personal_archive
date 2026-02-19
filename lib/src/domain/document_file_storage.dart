@@ -1,4 +1,4 @@
-abstract interface class DocumentFileStorage {
+abstract class DocumentFileStorage {
   /// Stores a document file from the given [sourceFilePath] for the specified [documentId].
   Future<void> storeForDocument(String documentId, String sourceFilePath);
 

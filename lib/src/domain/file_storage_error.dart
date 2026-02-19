@@ -1,5 +1,5 @@
 /// Base class for all file storage errors.
-sealed class FileStorageError implements Exception {
+abstract class FileStorageError implements Exception {
   final String message;
   final Object? cause;
 
@@ -13,16 +13,16 @@ sealed class FileStorageError implements Exception {
 class FileNotFoundStorageError extends FileStorageError {
   final String path;
 
-  const FileNotFoundStorageError(this.path, [super.cause])
-      : super('File not found at path: $path');
+  const FileNotFoundStorageError(this.path, [Object? cause])
+      : super('File not found at path: $path', cause);
 }
 
 /// Thrown when there is an error reading or writing a file.
 class FileIoStorageError extends FileStorageError {
-  const FileIoStorageError(super.message, [super.cause]);
+  const FileIoStorageError(String message, [Object? cause]) : super(message, cause);
 }
 
 /// Thrown when the storage root directory is invalid or inaccessible.
 class InvalidStorageRootError extends FileStorageError {
-  const InvalidStorageRootError(super.message, [super.cause]);
+  const InvalidStorageRootError(String message, [Object? cause]) : super(message, cause);
 }
