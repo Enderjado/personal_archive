@@ -3,6 +3,8 @@ export 'document.dart';
 export 'document_keyword_relation.dart';
 export 'document_keyword_repository.dart';
 export 'document_repository.dart';
+export 'embedding.dart';
+export 'embedding_repository.dart';
 export 'keyword.dart';
 export 'keyword_repository.dart';
 export 'page.dart';
