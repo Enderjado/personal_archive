@@ -4,3 +4,5 @@ export 'document_repository.dart';
 export 'page.dart';
 export 'page_repository.dart';
 export 'storage_error.dart';
+export 'summary.dart';
+export 'summary_repository.dart';
