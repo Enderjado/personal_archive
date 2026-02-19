@@ -225,6 +225,24 @@ void main() {
         expect(completedArchiveMidIds, ['filter-doc-3']);
       },
     );
+
+    test(
+      'summary upsert fails for non-existent documentId (FK constraint)',
+      () async {
+        final now = DateTime.utc(2025, 2, 19, 15, 0, 0);
+        final summary = Summary(
+          documentId: 'missing-doc-id',
+          text: 'Should not be stored',
+          modelVersion: 'qwen2.5-0.5b',
+          createdAt: now,
+        );
+
+        expect(
+          () => ctx.summaryRepository.upsert(summary),
+          throwsA(isA<StorageConstraintError>()),
+        );
+      },
+    );
   });
 }
 
