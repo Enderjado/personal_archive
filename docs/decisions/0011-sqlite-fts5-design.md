@@ -41,3 +41,13 @@ FTS is kept in sync by the **application layer**, not by SQLite triggers. When d
 - **Trigger-based (alternative):** Automatic sync on every insert/update/delete; no risk of forgetting to update FTS. Harder to debug and to test in isolation; triggers are less visible from application code.
 
 Implementation details (migrations, exact trigger vs repository calls) are left to the follow-up issue that creates the FTS tables and wiring.
+
+## Example queries
+
+The design supports queries that combine FTS matching with filters on the base schema. Examples:
+
+1. **Search documents by full text and filter by place**  
+   Match FTS on a user query, then join to `documents` and filter by `place_id` (or place name via `places`) so results are limited to a chosen location.
+
+2. **Search by text and restrict by date range**  
+   FTS match plus join to `documents` and filter on `created_at` (or another date field) to narrow results to a time window.
