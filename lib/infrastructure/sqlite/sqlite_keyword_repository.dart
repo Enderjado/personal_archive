@@ -2,15 +2,20 @@ import 'dart:math';
 
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
     show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [KeywordRepository].
 ///
 /// Stores [Keyword.createdAt] as Unix epoch milliseconds (INTEGER) in UTC.
 class SqliteKeywordRepository implements KeywordRepository {
-  SqliteKeywordRepository(this._db);
+  SqliteKeywordRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+  }) : _logger = logger;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
   static final Random _random = Random();
 
   static int _toEpochMillis(DateTime dateTime) {
@@ -58,12 +63,18 @@ class SqliteKeywordRepository implements KeywordRepository {
 
       final id = _generateId();
       final now = DateTime.now().toUtc();
-      await _db.execute(
-        '''
-        INSERT INTO keywords (id, value, type, global_frequency, created_at)
-        VALUES (?, ?, ?, 0, ?)
-        ''',
-        [id, value, type, _toEpochMillis(now)],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'get_or_create_keyword_insert',
+        table: 'keywords',
+        recordCount: 1,
+        action: () => _db.execute(
+          '''
+          INSERT INTO keywords (id, value, type, global_frequency, created_at)
+          VALUES (?, ?, ?, 0, ?)
+          ''',
+          [id, value, type, _toEpochMillis(now)],
+        ),
       );
       return Keyword(
         id: id,
@@ -80,9 +91,15 @@ class SqliteKeywordRepository implements KeywordRepository {
   @override
   Future<void> incrementGlobalFrequency(String keywordId) async {
     try {
-      await _db.execute(
-        'UPDATE keywords SET global_frequency = global_frequency + 1 WHERE id = ?',
-        [keywordId],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'increment_keyword_global_frequency',
+        table: 'keywords',
+        recordCount: 1,
+        action: () => _db.execute(
+          'UPDATE keywords SET global_frequency = global_frequency + 1 WHERE id = ?',
+          [keywordId],
+        ),
       );
     } catch (e) {
       _handleError(e);

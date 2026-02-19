@@ -1,14 +1,19 @@
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
     show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [SummaryRepository].
 ///
 /// Stores [Summary.createdAt] as Unix epoch milliseconds (INTEGER) in UTC.
 class SqliteSummaryRepository implements SummaryRepository {
-  SqliteSummaryRepository(this._db);
+  SqliteSummaryRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+  }) : _logger = logger;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
 
   static int _toEpochMillis(DateTime dateTime) {
     return dateTime.toUtc().millisecondsSinceEpoch;
@@ -40,21 +45,27 @@ class SqliteSummaryRepository implements SummaryRepository {
   @override
   Future<void> upsert(Summary summary) async {
     try {
-      await _db.execute(
-        '''
-        INSERT OR REPLACE INTO summaries (
-          document_id,
-          text,
-          model_version,
-          created_at
-        ) VALUES (?, ?, ?, ?)
-        ''',
-        [
-          summary.documentId,
-          summary.text,
-          summary.modelVersion,
-          _toEpochMillis(summary.createdAt),
-        ],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'upsert_summary',
+        table: 'summaries',
+        recordCount: 1,
+        action: () => _db.execute(
+          '''
+          INSERT OR REPLACE INTO summaries (
+            document_id,
+            text,
+            model_version,
+            created_at
+          ) VALUES (?, ?, ?, ?)
+          ''',
+          [
+            summary.documentId,
+            summary.text,
+            summary.modelVersion,
+            _toEpochMillis(summary.createdAt),
+          ],
+        ),
       );
     } catch (e) {
       _handleError(e);

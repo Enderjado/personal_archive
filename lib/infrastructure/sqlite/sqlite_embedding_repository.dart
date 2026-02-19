@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
     show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [EmbeddingRepository].
@@ -10,9 +11,13 @@ import 'package:personal_archive/src/domain/domain.dart';
 /// Stores [Embedding.createdAt] as Unix epoch milliseconds (INTEGER) in UTC
 /// when present; otherwise NULL.
 class SqliteEmbeddingRepository implements EmbeddingRepository {
-  SqliteEmbeddingRepository(this._db);
+  SqliteEmbeddingRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+  }) : _logger = logger;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
 
   static int _toEpochMillis(DateTime dateTime) {
     return dateTime.toUtc().millisecondsSinceEpoch;
@@ -57,21 +62,29 @@ class SqliteEmbeddingRepository implements EmbeddingRepository {
   @override
   Future<void> upsert(Embedding embedding) async {
     try {
-      await _db.execute(
-        '''
-        INSERT OR REPLACE INTO embeddings (
-          document_id,
-          vector,
-          model_version,
-          created_at
-        ) VALUES (?, ?, ?, ?)
-        ''',
-        [
-          embedding.documentId,
-          _vectorToJson(embedding.vector),
-          embedding.modelVersion,
-          embedding.createdAt != null ? _toEpochMillis(embedding.createdAt!) : null,
-        ],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'upsert_embedding',
+        table: 'embeddings',
+        recordCount: 1,
+        action: () => _db.execute(
+          '''
+          INSERT OR REPLACE INTO embeddings (
+            document_id,
+            vector,
+            model_version,
+            created_at
+          ) VALUES (?, ?, ?, ?)
+          ''',
+          [
+            embedding.documentId,
+            _vectorToJson(embedding.vector),
+            embedding.modelVersion,
+            embedding.createdAt != null
+                ? _toEpochMillis(embedding.createdAt!)
+                : null,
+          ],
+        ),
       );
     } catch (e) {
       _handleError(e);

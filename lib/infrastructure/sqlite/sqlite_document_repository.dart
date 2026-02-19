@@ -1,4 +1,6 @@
-import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart' show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/migrations/migration_runner.dart'
+    show MigrationDb;
+import 'package:personal_archive/infrastructure/sqlite/storage_logging.dart';
 import 'package:personal_archive/src/domain/domain.dart';
 
 /// SQLite-backed implementation of [DocumentRepository].
@@ -6,9 +8,13 @@ import 'package:personal_archive/src/domain/domain.dart';
 /// Uses [MigrationDb] for execution; stores dates as Unix epoch
 /// milliseconds (INTEGER) in UTC.
 class SqliteDocumentRepository implements DocumentRepository {
-  SqliteDocumentRepository(this._db);
+  SqliteDocumentRepository(
+    this._db, {
+    StorageLogger logger = const NoOpStorageLogger(),
+  }) : _logger = logger;
 
   final MigrationDb _db;
+  final StorageLogger _logger;
 
   static int _toEpochMillis(DateTime dateTime) {
     return dateTime.toUtc().millisecondsSinceEpoch;
@@ -48,23 +54,29 @@ class SqliteDocumentRepository implements DocumentRepository {
   @override
   Future<Document?> create(Document draft) async {
     try {
-      await _db.execute(
-        '''
-        INSERT INTO documents (
-          id, title, file_path, status, confidence_score,
-          place_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''',
-        [
-          draft.id,
-          draft.title,
-          draft.filePath,
-          draft.status.name,
-          draft.confidenceScore,
-          draft.placeId,
-          _toEpochMillis(draft.createdAt),
-          _toEpochMillis(draft.updatedAt),
-        ],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'create_document',
+        table: 'documents',
+        recordCount: 1,
+        action: () => _db.execute(
+          '''
+          INSERT INTO documents (
+            id, title, file_path, status, confidence_score,
+            place_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            draft.id,
+            draft.title,
+            draft.filePath,
+            draft.status.name,
+            draft.confidenceScore,
+            draft.placeId,
+            _toEpochMillis(draft.createdAt),
+            _toEpochMillis(draft.updatedAt),
+          ],
+        ),
       );
       return draft;
     } catch (e) {
@@ -89,22 +101,28 @@ class SqliteDocumentRepository implements DocumentRepository {
   @override
   Future<Document?> update(Document document) async {
     try {
-      await _db.execute(
-        '''
-        UPDATE documents SET
-          title = ?, file_path = ?, status = ?, confidence_score = ?,
-          place_id = ?, updated_at = ?
-        WHERE id = ?
-        ''',
-        [
-          document.title,
-          document.filePath,
-          document.status.name,
-          document.confidenceScore,
-          document.placeId,
-          _toEpochMillis(document.updatedAt),
-          document.id,
-        ],
+      await timeWriteOperation<void>(
+        logger: _logger,
+        operation: 'update_document',
+        table: 'documents',
+        recordCount: 1,
+        action: () => _db.execute(
+          '''
+          UPDATE documents SET
+            title = ?, file_path = ?, status = ?, confidence_score = ?,
+            place_id = ?, updated_at = ?
+          WHERE id = ?
+          ''',
+          [
+            document.title,
+            document.filePath,
+            document.status.name,
+            document.confidenceScore,
+            document.placeId,
+            _toEpochMillis(document.updatedAt),
+            document.id,
+          ],
+        ),
       );
       return document;
     } catch (e) {
