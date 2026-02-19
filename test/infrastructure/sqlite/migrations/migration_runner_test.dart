@@ -53,6 +53,8 @@ Future<List<Migration>> _loadTestMigrations() async {
       await rootBundle.loadString('assets/sql/migrations/004_add_keywords.sql');
   final documentKeywordsSql = await rootBundle.loadString(
       'assets/sql/migrations/005_add_document_keywords.sql');
+  final embeddingsSql =
+      await rootBundle.loadString('assets/sql/migrations/006_add_embeddings.sql');
 
   return <Migration>[
     Migration(
@@ -74,6 +76,10 @@ Future<List<Migration>> _loadTestMigrations() async {
     Migration(
       name: '005_add_document_keywords',
       sql: documentKeywordsSql,
+    ),
+    Migration(
+      name: '006_add_embeddings',
+      sql: embeddingsSql,
     ),
   ];
 }
@@ -382,6 +388,57 @@ VALUES (?, ?, ?, ?, ?)
       // Keywords remain (reusable).
       final keywordsAfter = await db.query('SELECT * FROM keywords', const []);
       expect(keywordsAfter, hasLength(2));
+    });
+
+    test('supports embeddings insert and read-back with cascade on document delete',
+        () async {
+      final db = Sqlite3MigrationDb(sqlite.sqlite3.openInMemory());
+
+      final runner = MigrationRunner(
+        db: db,
+        loadMigrations: _loadTestMigrations,
+      );
+
+      await runner.runAll();
+
+      const now = 2000;
+
+      // Insert a document.
+      await db.execute(
+        '''
+INSERT INTO documents (
+  id, title, file_path, status, confidence_score, place_id, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+''',
+        ['doc-emb', 'Embedding Test', '/path/emb.pdf', 'completed', null, null, now, now],
+      );
+
+      // Insert a dummy embedding (JSON array of floats).
+      const vectorJson = '[0.1,-0.2,0.3]';
+      await db.execute(
+        '''
+INSERT INTO embeddings (document_id, vector, model_version, created_at)
+VALUES (?, ?, ?, ?)
+''',
+        ['doc-emb', vectorJson, 'test-model-v1', now],
+      );
+
+      // Read back and verify.
+      final rows = await db.query(
+        'SELECT * FROM embeddings WHERE document_id = ?',
+        ['doc-emb'],
+      );
+      expect(rows, hasLength(1));
+      expect(rows.single['document_id'], 'doc-emb');
+      expect(rows.single['vector'], vectorJson);
+      expect(rows.single['model_version'], 'test-model-v1');
+      expect(rows.single['created_at'], now);
+
+      // Deleting document cascades to embeddings.
+      await db.execute('DELETE FROM documents WHERE id = ?', ['doc-emb']);
+      final embeddingsAfter =
+          await db.query('SELECT * FROM embeddings WHERE document_id = ?', ['doc-emb']);
+      expect(embeddingsAfter, isEmpty);
     });
   });
 }
