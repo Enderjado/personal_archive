@@ -148,6 +148,23 @@ void main() {
       expect(found, isNull);
     });
 
+    test('upsert throws StorageConstraintError when document does not exist',
+        () async {
+      const documentId = 'missing-doc-for-summary';
+
+      final summary = Summary(
+        documentId: documentId,
+        text: 'This should fail',
+        modelVersion: 'test-model',
+        createdAt: DateTime.utc(2025, 3, 1),
+      );
+
+      await expectLater(
+        () => repo.upsert(summary),
+        throwsA(isA<StorageConstraintError>()),
+      );
+    });
+
     test('works correctly when storage logging is enabled', () async {
       const documentId = 'doc-with-logged-summary';
       await db.execute(
