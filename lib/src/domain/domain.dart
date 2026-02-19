@@ -7,6 +7,8 @@ export 'keyword.dart';
 export 'keyword_repository.dart';
 export 'page.dart';
 export 'page_repository.dart';
+export 'place.dart';
+export 'place_repository.dart';
 export 'storage_error.dart';
 export 'summary.dart';
 export 'summary_repository.dart';
