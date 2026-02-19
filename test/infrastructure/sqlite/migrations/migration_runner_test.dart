@@ -57,6 +57,8 @@ Future<List<Migration>> _loadTestMigrations() async {
       'assets/sql/migrations/006_add_document_keywords.sql');
   final embeddingsSql =
       await rootBundle.loadString('assets/sql/migrations/007_add_embeddings.sql');
+  final documentsFtsSql = await rootBundle.loadString(
+      'assets/sql/migrations/008_add_documents_fts.sql');
 
   return <Migration>[
     Migration(
@@ -86,6 +88,10 @@ Future<List<Migration>> _loadTestMigrations() async {
     Migration(
       name: '007_add_embeddings',
       sql: embeddingsSql,
+    ),
+    Migration(
+      name: '008_add_documents_fts',
+      sql: documentsFtsSql,
     ),
   ];
 }
