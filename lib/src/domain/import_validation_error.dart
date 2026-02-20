@@ -1,11 +1,14 @@
+import 'storage_error.dart';
+
 /// Typed error for PDF import validation failures.
-abstract class ImportValidationError implements Exception {
+abstract class ImportValidationError extends StorageError {
   const ImportValidationError();
 
   /// A machine-readable code for the error.
   String get code;
 
   /// A human-readable message describing the error.
+  @override
   String get message;
 
   @override
