@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 import '../domain/document.dart';
 import '../domain/document_file_storage.dart';
 import '../domain/document_repository.dart';
@@ -29,7 +30,10 @@ class DocumentPipelineImpl implements DocumentPipeline {
     final metadata = await validator.validateFile(sourcePath);
 
     // 2. File Storage
-    
+    final documentId = const Uuid().v4();
+    await fileStorage.storeForDocument(documentId, sourcePath);
+    final storagePath = fileStorage.pathForDocument(documentId);
+
     // 3. Document Creation
     
     // 4. Page Extraction (Metadata)
