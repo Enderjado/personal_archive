@@ -33,7 +33,12 @@ class DocumentPipelineImpl implements DocumentPipeline {
 
     // 2. File Storage
     final documentId = const Uuid().v4();
-    await fileStorage.storeForDocument(documentId, sourcePath);
+    try {
+      await fileStorage.storeForDocument(documentId, sourcePath);
+    } catch (e) {
+      if (e is FileStorageError) rethrow;
+      throw FileIoStorageError('Unexpected error during file storage', e);
+    }
     final storagePath = fileStorage.pathForDocument(documentId);
 
     // 3. Document Creation
