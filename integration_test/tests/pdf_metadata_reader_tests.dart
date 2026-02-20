@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_archive/infrastructure/pdf/pdf_metadata_reader_impl.dart';
 import 'package:personal_archive/src/application/pdf_metadata_reader.dart';
@@ -23,12 +24,20 @@ void main() {
   group('PdfMetadataReaderImpl (integration)', () {
     testWidgets('reads correct page count from a valid PDF',
         (WidgetTester tester) async {
-      final testPdfPath = _resolveTestDataPath('Example_PDF.pdf');
-      _ensureFileExists(testPdfPath);
+      // Load the PDF from bundled assets and write to a temp file
+      final assetData =
+          await rootBundle.load('integration_test/assets/Example_PDF.pdf');
+      final tempDir = await Directory.systemTemp.createTemp('pdf_test_');
+      final testFile = File('${tempDir.path}/Example_PDF.pdf');
+      await testFile.writeAsBytes(assetData.buffer.asUint8List());
 
-      final PdfMetadata metadata = await reader.read(testPdfPath);
+      try {
+        final PdfMetadata metadata = await reader.read(testFile.path);
 
-      expect(metadata.pageCount, equals(13));
+        expect(metadata.pageCount, equals(13));
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
     });
 
     testWidgets('throws PdfReadError for a corrupt file',
@@ -56,39 +65,4 @@ void main() {
       );
     });
   });
-}
-
-/// Resolves the path to a file inside the test_data directory.
-///
-/// When running integration tests on desktop, the working directory may differ
-/// from the project root (e.g. it may be the build output directory). We walk
-/// up from the current directory until we find the project marker (pubspec.yaml)
-/// and resolve relative to that.
-String _resolveTestDataPath(String filename) {
-  // Try relative first (works when cwd is project root)
-  final relative = 'test/infrastructure/pdf/test_data/$filename';
-  if (File(relative).existsSync()) return relative;
-
-  // Walk up from cwd looking for the project root
-  var dir = Directory.current;
-  for (var i = 0; i < 10; i++) {
-    final candidate = '${dir.path}/test/infrastructure/pdf/test_data/$filename';
-    if (File(candidate).existsSync()) return candidate;
-    final parent = dir.parent;
-    if (parent.path == dir.path) break;
-    dir = parent;
-  }
-
-  // Last resort: absolute path based on known project location
-  return '/Users/juliusluckefahr/Projects/personal_archive/test/infrastructure/pdf/test_data/$filename';
-}
-
-/// Guards against a missing test fixture so the failure message is clear.
-void _ensureFileExists(String path) {
-  if (!File(path).existsSync()) {
-    fail(
-      'Test fixture not found at "$path". '
-      'Place a valid PDF named "Example_PDF.pdf" in test/infrastructure/pdf/test_data/.',
-    );
-  }
 }
