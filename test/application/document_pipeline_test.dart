@@ -1,6 +1,7 @@
 import 'package:mocktail/mocktail.dart';
 import 'package:personal_archive/src/application/document_pipeline_impl.dart';
 import 'package:personal_archive/src/application/import_validator.dart';
+import 'package:personal_archive/src/application/search_index_sync.dart';
 import 'package:personal_archive/src/application/pdf_metadata_reader.dart'; // Added missing import
 import 'package:personal_archive/src/domain/document.dart';
 import 'package:personal_archive/src/domain/document_file_storage.dart';
@@ -18,6 +19,7 @@ class MockDocumentFileStorage extends Mock implements DocumentFileStorage {}
 class MockPdfMetadataReader extends Mock implements PdfMetadataReader {} // This is just a placeholder since we use Validator for metadata
 class MockDocumentRepository extends Mock implements DocumentRepository {}
 class MockPageRepository extends Mock implements PageRepository {}
+class MockSearchIndexSync extends Mock implements SearchIndexSync {}
 
 void main() {
   group('DocumentPipelineImpl', () {
@@ -27,6 +29,7 @@ void main() {
     late MockPdfMetadataReader mockMetadataReader;
     late MockDocumentRepository mockDocumentRepository;
     late MockPageRepository mockPageRepository;
+    late MockSearchIndexSync mockSearchIndexSync;
 
     setUp(() {
       mockValidator = MockImportValidator();
@@ -34,6 +37,9 @@ void main() {
       mockMetadataReader = MockPdfMetadataReader();
       mockDocumentRepository = MockDocumentRepository();
       mockPageRepository = MockPageRepository();
+      mockSearchIndexSync = MockSearchIndexSync();
+
+      when(() => mockSearchIndexSync.syncDocument(any())).thenAnswer((_) async {});
 
       pipeline = DocumentPipelineImpl(
         validator: mockValidator,
@@ -41,6 +47,7 @@ void main() {
         metadataReader: mockMetadataReader,
         documentRepository: mockDocumentRepository,
         pageRepository: mockPageRepository,
+        searchIndexSync: mockSearchIndexSync,
       );
       
       // Register fallback values for arguments used in `any()` or `captureAny()`
@@ -96,6 +103,9 @@ void main() {
       expect(capturedPages.length, equals(pageCount));
       expect(capturedPages[0].pageNumber, equals(1));
       expect(capturedPages[2].pageNumber, equals(3));
+      
+      // Verify FTS sync
+      verify(() => mockSearchIndexSync.syncDocument(any())).called(1);
     });
 
     test('importFromPath fails on validation error and aborts', () async {
