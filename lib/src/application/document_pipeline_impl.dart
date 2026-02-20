@@ -25,8 +25,9 @@ class DocumentPipelineImpl implements DocumentPipeline {
 
   @override
   Future<ImportResult> importFromPath(String sourcePath) async {
-    // 1. Validation
-    
+    // 1. Validation. We get the metadata here to avoid reading it twice.
+    final metadata = await validator.validateFile(sourcePath);
+
     // 2. File Storage
     
     // 3. Document Creation
