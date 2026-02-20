@@ -11,6 +11,7 @@ import '../domain/pdf_metadata.dart';
 import 'document_pipeline.dart';
 import 'import_validator.dart';
 import 'pdf_metadata_reader.dart';
+import 'search_index_sync.dart';
 
 /// Concrete implementation of the [DocumentPipeline].
 class DocumentPipelineImpl implements DocumentPipeline {
@@ -20,6 +21,7 @@ class DocumentPipelineImpl implements DocumentPipeline {
     required this.metadataReader,
     required this.documentRepository,
     required this.pageRepository,
+    required this.searchIndexSync,
   });
 
   final ImportValidator validator;
@@ -27,6 +29,7 @@ class DocumentPipelineImpl implements DocumentPipeline {
   final PdfMetadataReader metadataReader;
   final DocumentRepository documentRepository;
   final PageRepository pageRepository;
+  final SearchIndexSync searchIndexSync;
 
   @override
   Future<ImportResult> importFromPath(String sourcePath) async {
@@ -100,9 +103,22 @@ class DocumentPipelineImpl implements DocumentPipeline {
       await pageRepository.insertAll(pages);
     } catch (e) {
       // If page insertion fails, we must rollback the document and file.
-      await _cleanupDocument(documentId);
-      await _cleanupFile(documentId);
+      try {
+        await _cleanupDocument(documentId);
+      } catch (_) {}
+      try {
+        await _cleanupFile(documentId);
+      } catch (_) {}
       rethrow;
+    }
+
+    // 6. Search Index Sync (Best-effort)
+    try {
+      await searchIndexSync.syncDocument(documentId);
+    } catch (e) {
+      // Log failure but do not fail the import.
+      // This allows the user to see the document even if search is temporarily out of sync.
+      // In a real application, this should be logged to a monitoring service.
     }
 
     return ImportResult(
