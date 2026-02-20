@@ -11,6 +11,7 @@ export 'keyword.dart';
 export 'keyword_repository.dart';
 export 'page.dart';
 export 'page_repository.dart';
+export 'pdf_metadata.dart';
 export 'place.dart';
 export 'place_repository.dart';
 export 'storage_error.dart';
