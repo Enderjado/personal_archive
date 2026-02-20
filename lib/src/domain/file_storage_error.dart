@@ -1,5 +1,8 @@
+import 'storage_error.dart';
+
 /// Base class for all file storage errors.
-abstract class FileStorageError implements Exception {
+abstract class FileStorageError extends StorageError {
+  @override
   final String message;
   final Object? cause;
 
