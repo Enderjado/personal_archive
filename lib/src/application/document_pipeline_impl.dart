@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:path/path.dart' as p;
 import '../domain/document.dart';
 import '../domain/document_file_storage.dart';
 import '../domain/document_repository.dart';
@@ -35,7 +36,21 @@ class DocumentPipelineImpl implements DocumentPipeline {
     final storagePath = fileStorage.pathForDocument(documentId);
 
     // 3. Document Creation
+    final title = p.basenameWithoutExtension(sourcePath);
+    final now = DateTime.now().toUtc();
     
+    final document = Document(
+      id: documentId,
+      title: title,
+      filePath: storagePath,
+      status: DocumentStatus.imported,
+      createdAt: now,
+      updatedAt: now,
+      // confidenceScore and placeId are null initially
+    );
+    
+    await documentRepository.create(document);
+
     // 4. Page Extraction (Metadata)
     
     // 5. Page Creation
