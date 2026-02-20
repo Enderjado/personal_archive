@@ -18,4 +18,7 @@ abstract class DocumentRepository {
     String? placeId,
     DateTimeRange? createdBetween,
   });
+
+  /// Deletes a document by [id].
+  Future<void> delete(String id);
 }

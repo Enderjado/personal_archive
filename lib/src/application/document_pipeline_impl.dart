@@ -5,6 +5,8 @@ import '../domain/page.dart';
 import '../domain/document_file_storage.dart';
 import '../domain/document_repository.dart';
 import '../domain/page_repository.dart';
+import '../domain/file_storage_error.dart';
+import '../domain/storage_error.dart';
 import '../domain/pdf_metadata.dart';
 import 'document_pipeline.dart';
 import 'import_validator.dart';
