@@ -31,3 +31,8 @@ Related decision: PDF metadata library selection is documented in `docs/decision
 - + Explicit cleanup semantics prevent orphan managed files and partial import state.
 - - Requires storage-root configuration and write-permission validation.
 - - May temporarily duplicate disk usage during import.
+
+## Implementation References
+
+- `DocumentFileStorage` / `LocalDocumentFileStorage`: [lib/infrastructure/file_storage/local_document_file_storage.dart](lib/infrastructure/file_storage/local_document_file_storage.dart)
+- `DocumentPipeline`: orchestrates the storage and cleanup logic.

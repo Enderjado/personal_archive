@@ -27,3 +27,7 @@ Related decision: imported file storage root/layout and cleanup semantics are do
 - - Adds native/plugin dependency surface and platform-specific runtime considerations.
 - - Malformed/encrypted PDFs may still fail metadata reads and must be mapped to typed validation/metadata errors.
 - - If future requirements need advanced PDF semantics, this decision may need revision in a follow-up ADR.
+
+## Implementation References
+
+- `PdfMetadataReader` / `PdfMetadataReaderImpl`: [lib/infrastructure/pdf/pdf_metadata_reader_impl.dart](lib/infrastructure/pdf/pdf_metadata_reader_impl.dart)
