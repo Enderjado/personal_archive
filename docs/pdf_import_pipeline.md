@@ -49,7 +49,7 @@ The output of this phase is a correctly imported, internally tracked document re
 
 ## File Storage Strategy
 
-Imported PDFs are persisted in application-managed storage so document processing is independent from the original user-selected file location.
+Imported PDFs are persisted in application-managed storage so document processing is independent from the original user-selected file location. Detailed architectural decisions are documented in [docs/decisions/0012-file-storage-strategy-for-imported-pdfs.md](docs/decisions/0012-file-storage-strategy-for-imported-pdfs.md).
 
 ### Storage Root
 
@@ -190,7 +190,7 @@ Responsibilities:
 
 ### `PdfMetadataReader`
 
-Abstracts PDF metadata access used during import.
+Abstracts PDF metadata access used during import. The choice of underlying PDF library is documented in [docs/decisions/0013-pdf-library-choice-for-metadata.md](docs/decisions/0013-pdf-library-choice-for-metadata.md).
 
 Responsibilities:
 
