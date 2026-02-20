@@ -135,3 +135,13 @@ It’s an attempt to build a system where information is organized by meaning, n
 
 ---
 
+## Testing
+
+This project emphasizes reliability and maintainability through rigorous testing.
+
+Please refer to the following documents for more details:
+* [Integration Testing](docs/integration_testing.md) - How to run and extend end-to-end tests
+* [Testing Philosophy](docs/decisions/0009-testing-philosophy.md) - The reasoning behind our testing approach
+
+---
+

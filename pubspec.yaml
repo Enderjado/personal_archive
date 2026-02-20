@@ -31,3 +31,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/sql/migrations/
+    - integration_test/assets/
