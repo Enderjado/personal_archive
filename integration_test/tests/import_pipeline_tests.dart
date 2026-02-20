@@ -112,5 +112,55 @@ void main() {
       );
       expect(ftsResult, isNotEmpty);
     });
+
+    testWidgets('Import Pipeline Failure Cleanup', (WidgetTester tester) async {
+      // 1. Arrange: Setup dependencies
+      final documentRepo = SqliteDocumentRepository(migrationDb);
+      final pageRepo = SqlitePageRepository(migrationDb);
+      final ftsSync = SqliteFtsSyncService(migrationDb);
+      final fileStorage = LocalDocumentFileStorage(storageDir.path);
+      final metadataReader = PdfMetadataReaderImpl();
+      final validator = ImportValidator(
+        pdfMetadataReader: metadataReader,
+      );
+
+      final pipeline = DocumentPipelineImpl(
+        validator: validator,
+        fileStorage: fileStorage,
+        metadataReader: metadataReader,
+        documentRepository: documentRepo,
+        pageRepository: pageRepo,
+        searchIndexSync: ftsSync,
+      );
+
+      // Create a dummy file that is NOT a PDF to trigger a validation error or processing error
+      final invalidFile = File(p.join(storageDir.path, 'invalid_test.txt'));
+      await invalidFile.writeAsString('This is not a PDF content');
+
+      // 2. Act & Assert: Expect an error when importing
+      try {
+        await pipeline.importFromPath(invalidFile.path);
+        fail('Pipeline should fail for invalid PDF');
+      } catch (e) {
+        // We expect it to fail, ideally with a specific error type if we knew it
+        // e.g. ImportValidationError or StorageError
+        expect(e, isNotNull);
+      }
+
+      // 3. Assert: Verify no data was persisted (Cleanup check)
+      
+      // Database should be empty of documents
+      final docs = await documentRepo.list();
+      expect(docs, isEmpty);
+
+      // Files should not be stored in the permanent storage location
+      // LocalDocumentFileStorage might create directories, but strictly speaking no documents should be there
+      // We check if the storage root contains any files other than our input temp file
+      final storedFiles = storageDir.listSync(recursive: true).where((entity) {
+        return entity is File && entity.path != invalidFile.path;
+      });
+      
+      expect(storedFiles, isEmpty);
+    });
   });
 }
