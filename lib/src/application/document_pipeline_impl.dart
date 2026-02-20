@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as p;
 import '../domain/document.dart';
+import '../domain/page.dart';
 import '../domain/document_file_storage.dart';
 import '../domain/document_repository.dart';
 import '../domain/page_repository.dart';
@@ -52,9 +53,23 @@ class DocumentPipelineImpl implements DocumentPipeline {
     await documentRepository.create(document);
 
     // 4. Page Extraction (Metadata)
+    // We already have the metadata from the validation step.
+    final pageCount = metadata.pageCount;
     
     // 5. Page Creation
-    
-    throw UnimplementedError();
+    final pages = List.generate(pageCount, (index) {
+      final pageNumber = index + 1;
+      return Page(
+        documentId: documentId,
+        pageNumber: pageNumber,
+      );
+    });
+
+    await pageRepository.insertAll(pages);
+
+    return ImportResult(
+      document: document,
+      pageCount: pageCount,
+    );
   }
 }
