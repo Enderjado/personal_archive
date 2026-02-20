@@ -180,4 +180,13 @@ class SqliteDocumentRepository implements DocumentRepository {
       throw StorageUnknownError(e);
     }
   }
+
+  @override
+  Future<void> delete(String id) async {
+    try {
+      await _db.execute('DELETE FROM documents WHERE id = ?', [id]);
+    } catch (e) {
+      throw StorageUnknownError(e);
+    }
+  }
 }
