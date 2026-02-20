@@ -7,6 +7,7 @@ export 'document_repository.dart';
 export 'embedding.dart';
 export 'embedding_repository.dart';
 export 'file_storage_error.dart';
+export 'import_validation_error.dart';
 export 'keyword.dart';
 export 'keyword_repository.dart';
 export 'page.dart';
