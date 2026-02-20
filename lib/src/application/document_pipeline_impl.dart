@@ -55,7 +55,13 @@ class DocumentPipelineImpl implements DocumentPipeline {
       // confidenceScore and placeId are null initially
     );
     
-    await documentRepository.create(document);
+    try {
+      await documentRepository.create(document);
+    } catch (e) {
+      // If DB creation fails, we must clean up the file we just copied.
+      await _cleanupFile(documentId);
+      rethrow;
+    }
 
     // 4. Page Extraction (Metadata)
     // We already have the metadata from the validation step.
@@ -77,5 +83,15 @@ class DocumentPipelineImpl implements DocumentPipeline {
       document: document,
       pageCount: pageCount,
     );
+  }
+
+  /// Helper to clean up the stored file and log any errors during cleanup.
+  Future<void> _cleanupFile(String documentId) async {
+    try {
+      await fileStorage.removeForDocument(documentId);
+    } catch (e) {
+      // In a real app, use a logger service here.
+      // print('Failed to cleanup file for document $documentId: $e');
+    }
   }
 }
