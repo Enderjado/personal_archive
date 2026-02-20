@@ -57,9 +57,10 @@ class DocumentPipelineImpl implements DocumentPipeline {
     final pageCount = metadata.pageCount;
     
     // 5. Page Creation
-    final pages = List.generate(pageCount, (index) {
+    final pages = List<Page>.generate(pageCount, (index) {
       final pageNumber = index + 1;
       return Page(
+        id: const Uuid().v4(),
         documentId: documentId,
         pageNumber: pageNumber,
       );
