@@ -1,16 +1,29 @@
-import 'package:personal_archive/src/domain/domain.dart';
+import '../domain/pdf_metadata.dart';
 
-/// Port that extracts metadata from a PDF file.
-///
-/// Implementations live in the infrastructure layer and are injected at
-/// composition root, allowing tests to substitute a fake without touching I/O.
-///
-/// Throws a [PdfReadError] subclass on any failure (file not found,
-/// malformed PDF, unexpected I/O error).
+/// Typed error thrown when a PDF file cannot be read or parsed.
+class PdfReadError implements Exception {
+  const PdfReadError(this.message, [this.cause]);
+
+  /// A descriptive message explaining the failure.
+  final String message;
+
+  /// The underlying exception or error that caused the failure, if any.
+  final Object? cause;
+
+  @override
+  String toString() {
+    if (cause != null) {
+      return 'PdfReadError: $message (Cause: $cause)';
+    }
+    return 'PdfReadError: $message';
+  }
+}
+
+/// Abstraction for reading metadata from PDF files.
 abstract class PdfMetadataReader {
-  /// Reads metadata from the PDF located at [path].
+  /// Reads metadata (such as page count) from the PDF at the given [path].
   ///
-  /// Returns a [PdfMetadata] instance on success.
-  /// Throws [PdfReadError] on failure.
+  /// Throws a [PdfReadError] if the file does not exist, is not a valid PDF,
+  /// or cannot be read.
   Future<PdfMetadata> read(String path);
 }
