@@ -15,6 +15,7 @@ dependencies:
   path: ^1.9.1
   pdfx: ^2.9.2
   sqlite3: ^3.1.6
+  uuid: ^4.5.2
 
 
 dev_dependencies:
@@ -24,6 +25,7 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^2.0.0
+  mocktail: ^1.0.4
 
 flutter:
   uses-material-design: true
