@@ -19,6 +19,7 @@ export 'page_repository.dart';
 export 'pdf_metadata.dart';
 export 'place.dart';
 export 'place_repository.dart';
+export 'render_configuration.dart';
 export 'storage_error.dart';
 export 'summary.dart';
 export 'summary_repository.dart';

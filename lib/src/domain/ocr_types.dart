@@ -1,3 +1,5 @@
+import 'dart:typed_data' show Uint8List;
+
 /// Represents the input source for an OCR operation.
 ///
 /// This allows for different types of inputs (e.g., file path,
@@ -23,6 +25,40 @@ class FileOcrInput extends OcrInput {
 
   @override
   int get hashCode => filePath.hashCode;
+}
+
+/// An OCR input backed by in-memory image bytes.
+///
+/// This avoids disk round-trips when the renderer can produce image data
+/// directly and the OCR engine can consume byte buffers.
+class MemoryOcrInput extends OcrInput {
+  /// The raw image bytes (e.g. PNG or JPEG encoded).
+  final Uint8List bytes;
+
+  /// The width of the image in pixels, if known.
+  final int? width;
+
+  /// The height of the image in pixels, if known.
+  final int? height;
+
+  const MemoryOcrInput(this.bytes, {this.width, this.height});
+
+  @override
+  String toString() =>
+      'MemoryOcrInput(bytesLength: ${bytes.lengthInBytes}, '
+      'width: $width, height: $height)';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is MemoryOcrInput &&
+        other.bytes == bytes &&
+        other.width == width &&
+        other.height == height;
+  }
+
+  @override
+  int get hashCode => Object.hash(bytes, width, height);
 }
 
 /// Represents the result of an OCR operation on a single page.
