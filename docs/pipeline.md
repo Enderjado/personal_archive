@@ -74,24 +74,31 @@ The pipeline follows this sequence:
 
 **Responsibility:**
 
-* Extract raw text from each page using platform-native OCR:
-
-  * Windows: Microsoft OCR API
-  * macOS: Apple Vision OCR
-* Generate confidence scores for each page.
-* Handle errors gracefully and allow retry.
+*   **Render**: Convert each PDF page to an image optimized for OCR (using `pdfx`, per ADR 0015).
+*   **Extract**: Use platform-native APIs to extract text:
+    *   Windows: Microsoft OCR API
+    *   macOS: Apple Vision Framework
+    *   *(Abstracted via `OCREngine` and `OcrInput` per ADR 0014 & 0016)*
+*   **Persist**: Update `Page` entities with `rawText` and `ocrConfidence`.
+*   **Status**: Advance document status from `imported` → `processing` → `completed` (or `failed`).
 
 **Interfaces:**
 
-* `OCREngine.extractText(Page)`
+*   `PdfPageRenderer.renderPage(Document, Page)` → `OcrInput`
+*   `OCREngine.processPage(OcrInput)` → `OcrPageResult`
+*   `PageRepository.updatePageText(...)`
 
 **Outputs:**
 
-* Updated Page entities with `rawText` and `confidenceScore`.
+*   Updated `Page` entities in the database.
+*   Document status updated to `completed` for successful runs.
 
 **Notes:**
 
-* OCR is encapsulated behind an interface to allow swapping engines or upgrading in the future.
+*   OCR is the first heavy processing stage. It runs locally and asynchronously.
+*   Failures at this stage differ from import validation; they are runtime errors (e.g., engine crash, obscure PDF font).
+*   See `docs/decisions/0014-ocr-input-abstraction.md` for the input data contract.
+
 
 ---
 
