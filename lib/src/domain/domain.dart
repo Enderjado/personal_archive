@@ -13,11 +13,8 @@ export 'keyword.dart';
 export 'keyword_repository.dart';
 export 'ocr_engine.dart';
 export 'ocr_error.dart';
-
 export 'ocr_types.dart';
-
 export 'page.dart';
-
 export 'page_repository.dart';
 export 'pdf_metadata.dart';
 export 'place.dart';
