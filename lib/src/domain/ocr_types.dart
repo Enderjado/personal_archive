@@ -1,8 +1,8 @@
 /// Represents the input source for an OCR operation.
 ///
-/// This is a sealed class to allow for different types of inputs (e.g., file path,
+/// This allows for different types of inputs (e.g., file path,
 /// bytes, etc.) in a type-safe way.
-sealed class OcrInput {
+abstract class OcrInput {
   const OcrInput();
 }
 
