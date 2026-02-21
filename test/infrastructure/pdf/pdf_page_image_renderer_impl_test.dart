@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_archive/infrastructure/pdf/pdf_page_image_renderer_impl.dart';
 import 'package:personal_archive/src/application/pdf_page_image_renderer.dart';
+import 'package:personal_archive/src/domain/ocr_types.dart';
+import 'package:personal_archive/src/domain/render_configuration.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -95,6 +98,101 @@ void main() {
       final error = PdfRenderError('test message');
       expect(error.toString(), equals('PdfRenderError: test message'));
       expect(error.toString(), isNot(contains('Cause:')));
+    });
+  });
+
+  group('PdfPageImageRendererImpl – valid PDF (platform-dependent)', () {
+    late PdfPageImageRendererImpl renderer;
+    late File validPdf;
+
+    setUpAll(() {
+      validPdf = File('test/infrastructure/pdf/test_data/Example_PDF.pdf');
+    });
+
+    setUp(() {
+      renderer = PdfPageImageRendererImpl();
+    });
+
+    test('renderPage on a valid PDF wraps platform error in PdfRenderError',
+        () async {
+      // Note: pdfx relies on native platform channels (MethodChannel) to render
+      // PDF pages. In a pure Dart unit test environment (flutter test), these
+      // native channels are not available. To fully test successful rendering,
+      // an integration test running on a real device/emulator is required.
+      //
+      // This unit test verifies that the platform error is correctly caught and
+      // wrapped in our PdfRenderError, proving the error-handling path works.
+      expect(
+        () => renderer.renderPage(validPdf.path, 1),
+        throwsA(isA<PdfRenderError>()),
+      );
+    });
+  });
+
+  group('PdfPageImageRendererImpl – configuration', () {
+    test('accepts custom RenderConfiguration', () {
+      final config = RenderConfiguration(dpi: 150);
+      final renderer = PdfPageImageRendererImpl(config: config);
+      // Renderer should be created without errors
+      expect(renderer, isNotNull);
+    });
+
+    test('uses default RenderConfiguration when none provided', () {
+      final renderer = PdfPageImageRendererImpl();
+      expect(renderer, isNotNull);
+    });
+  });
+
+  group('MemoryOcrInput', () {
+    test('stores bytes and optional dimensions', () {
+      final bytes = Uint8List.fromList([1, 2, 3, 4]);
+      final input = MemoryOcrInput(bytes, width: 100, height: 200);
+
+      expect(input.bytes, equals(bytes));
+      expect(input.width, 100);
+      expect(input.height, 200);
+    });
+
+    test('allows null dimensions', () {
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      final input = MemoryOcrInput(bytes);
+
+      expect(input.width, isNull);
+      expect(input.height, isNull);
+    });
+
+    test('equality compares bytes and dimensions', () {
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      final a = MemoryOcrInput(bytes, width: 10, height: 20);
+      final b = MemoryOcrInput(bytes, width: 10, height: 20);
+      final c = MemoryOcrInput(bytes, width: 99, height: 20);
+
+      expect(a, equals(b));
+      expect(a, isNot(equals(c)));
+    });
+
+    test('hashCode is consistent with equality', () {
+      final bytes = Uint8List.fromList([5, 6, 7]);
+      final a = MemoryOcrInput(bytes, width: 10, height: 20);
+      final b = MemoryOcrInput(bytes, width: 10, height: 20);
+
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('toString includes byte length and dimensions', () {
+      final bytes = Uint8List.fromList([1, 2, 3, 4, 5]);
+      final input = MemoryOcrInput(bytes, width: 640, height: 480);
+
+      expect(input.toString(), contains('bytesLength: 5'));
+      expect(input.toString(), contains('width: 640'));
+      expect(input.toString(), contains('height: 480'));
+    });
+
+    test('is a subtype of OcrInput', () {
+      final bytes = Uint8List.fromList([1]);
+      final input = MemoryOcrInput(bytes);
+
+      expect(input, isA<OcrInput>());
     });
   });
 }
