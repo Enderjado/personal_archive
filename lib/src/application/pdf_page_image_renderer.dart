@@ -24,6 +24,11 @@ class PdfRenderError implements Exception {
 /// The pipeline uses this to convert each PDF page into a form that the
 /// [OCREngine] can consume, without coupling to a specific PDF library
 /// or rendering approach.
+///
+/// **Cleanup contract**: implementations that return a [MemoryOcrInput] have
+/// no cleanup obligations. Implementations that write temp files must either
+/// delete them before returning or document that the caller is responsible
+/// for cleanup (see ADR 0015).
 abstract class PdfPageImageRenderer {
   /// Renders page [pageNumber] (1-based) of the PDF at [pdfPath] and returns
   /// an [OcrInput] suitable for the OCR engine.

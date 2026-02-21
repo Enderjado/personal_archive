@@ -12,6 +12,18 @@ const double _pdfBaseDpi = 72.0;
 /// Renders a single PDF page to an in-memory PNG image and returns it as a
 /// [MemoryOcrInput]. Uses the same library as [PdfMetadataReaderImpl] to keep
 /// the dependency footprint small (see ADR 0015).
+///
+/// **Temporary-file cleanup strategy** (see ADR 0015):
+///
+/// This renderer produces [MemoryOcrInput] (in-memory bytes), so it does not
+/// write application-level temp files. The underlying `pdfx` native layer may
+/// create platform temp files during rendering; passing `removeTempFile: true`
+/// (the default) ensures those are deleted before `render()` returns.
+///
+/// If a downstream [OCREngine] adapter requires a file-based input, the
+/// *adapter* is responsible for writing and cleaning up that file (typically
+/// via `try`/`finally`). The renderer itself guarantees no unbounded temp-file
+/// growth across a multi-page run.
 class PdfPageImageRendererImpl implements PdfPageImageRenderer {
   /// Creates a renderer with the given [RenderConfiguration].
   ///
@@ -47,6 +59,8 @@ class PdfPageImageRendererImpl implements PdfPageImageRenderer {
       final renderWidth = (page.width * scale).round();
       final renderHeight = (page.height * scale).round();
 
+      // pdfx removes any platform temp files after rendering by default
+      // (removeTempFile defaults to true internally).
       final pageImage = await page.render(
         width: renderWidth.toDouble(),
         height: renderHeight.toDouble(),
