@@ -2,9 +2,7 @@ import 'package:pdfx/pdfx.dart';
 
 import '../../src/application/pdf_page_image_renderer.dart';
 import '../../src/domain/ocr_types.dart';
-
-/// Default rendering resolution in DPI.
-const int _defaultDpi = 300;
+import '../../src/domain/render_configuration.dart';
 
 /// The base resolution of a PDF page in points-per-inch.
 const double _pdfBaseDpi = 72.0;
@@ -15,12 +13,13 @@ const double _pdfBaseDpi = 72.0;
 /// [MemoryOcrInput]. Uses the same library as [PdfMetadataReaderImpl] to keep
 /// the dependency footprint small (see ADR 0015).
 class PdfPageImageRendererImpl implements PdfPageImageRenderer {
-  /// Creates a renderer with the given [dpi] resolution.
+  /// Creates a renderer with the given [RenderConfiguration].
   ///
-  /// Defaults to 300 DPI, which provides good OCR accuracy.
-  PdfPageImageRendererImpl({int dpi = _defaultDpi}) : _dpi = dpi;
+  /// Defaults to 300 DPI (via [RenderConfiguration] defaults).
+  PdfPageImageRendererImpl({RenderConfiguration? config})
+      : _config = config ?? const RenderConfiguration();
 
-  final int _dpi;
+  final RenderConfiguration _config;
 
   @override
   Future<OcrInput> renderPage(String pdfPath, int pageNumber) async {
@@ -44,7 +43,7 @@ class PdfPageImageRendererImpl implements PdfPageImageRenderer {
 
       page = await document.getPage(pageNumber);
 
-      final scale = _dpi / _pdfBaseDpi;
+      final scale = _config.dpi / _pdfBaseDpi;
       final renderWidth = (page.width * scale).round();
       final renderHeight = (page.height * scale).round();
 

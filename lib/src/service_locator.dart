@@ -1,5 +1,7 @@
 import 'package:personal_archive/infrastructure/pdf/pdf_metadata_reader_impl.dart';
+import 'package:personal_archive/infrastructure/pdf/pdf_page_image_renderer_impl.dart';
 import 'package:personal_archive/src/application/application.dart';
+import 'package:personal_archive/src/domain/render_configuration.dart';
 
 /// Simple service locator for dependency injection.
 ///
@@ -11,7 +13,9 @@ class ServiceLocator {
   static final ServiceLocator instance = ServiceLocator._();
 
   PdfMetadataReader? _pdfMetadataReader;
+  PdfPageImageRenderer? _pdfPageImageRenderer;
   ImportValidator? _importValidator;
+  RenderConfiguration _renderConfiguration = const RenderConfiguration();
 
   /// Returns the registered [PdfMetadataReader] implementation.
   PdfMetadataReader get pdfMetadataReader {
@@ -21,6 +25,30 @@ class ServiceLocator {
   /// Overrides the [PdfMetadataReader] instance (useful for testing).
   set pdfMetadataReader(PdfMetadataReader reader) {
     _pdfMetadataReader = reader;
+  }
+
+  /// Returns the registered [PdfPageImageRenderer] implementation.
+  PdfPageImageRenderer get pdfPageImageRenderer {
+    return _pdfPageImageRenderer ??= PdfPageImageRendererImpl(
+      config: _renderConfiguration,
+    );
+  }
+
+  /// Overrides the [PdfPageImageRenderer] instance (useful for testing).
+  set pdfPageImageRenderer(PdfPageImageRenderer renderer) {
+    _pdfPageImageRenderer = renderer;
+  }
+
+  /// Returns the current [RenderConfiguration].
+  RenderConfiguration get renderConfiguration => _renderConfiguration;
+
+  /// Overrides the [RenderConfiguration].
+  ///
+  /// If a [PdfPageImageRenderer] has already been created, it will continue
+  /// using the old configuration. Reset the renderer to pick up changes.
+  set renderConfiguration(RenderConfiguration config) {
+    _renderConfiguration = config;
+    _pdfPageImageRenderer = null; // force re-creation with new config
   }
 
   /// Returns the registered [ImportValidator] implementation.
@@ -38,6 +66,8 @@ class ServiceLocator {
   /// Resets all registrations. Intended for test teardown only.
   void reset() {
     _pdfMetadataReader = null;
+    _pdfPageImageRenderer = null;
     _importValidator = null;
+    _renderConfiguration = const RenderConfiguration();
   }
 }
