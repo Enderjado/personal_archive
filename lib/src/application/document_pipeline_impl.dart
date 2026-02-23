@@ -183,6 +183,9 @@ class DocumentPipelineImpl implements DocumentPipeline {
     // pageCount is hoisted so the return value at the end of the method can
     // reference it even though `pages` is scoped inside the try block.
     var pageCount = 0;
+    // Accumulate per-page confidence values so we can compute the mean at the end.
+    // Pages whose OCR result carries a null confidence do not contribute to the average.
+    final confidenceValues = <double>[];
     try {
       // 3. Load pages.
       final List<Page> pages;
@@ -217,6 +220,10 @@ class DocumentPipelineImpl implements DocumentPipeline {
             pageNumber: page.pageNumber,
             cause: e,
           );
+        }
+
+        if (ocrResult.confidence != null) {
+          confidenceValues.add(ocrResult.confidence!);
         }
 
         // 4c. Persist OCR results to page.
@@ -260,7 +267,14 @@ class DocumentPipelineImpl implements DocumentPipeline {
       // Search sync failure is non-fatal.
     }
 
-    // NOTE: aggregateConfidence is computed in a later commit (6.8).
-    return OcrResult(documentId: documentId, pageCount: pageCount);
+    final aggregateConfidence = confidenceValues.isEmpty
+        ? null
+        : confidenceValues.reduce((a, b) => a + b) / confidenceValues.length;
+
+    return OcrResult(
+      documentId: documentId,
+      pageCount: pageCount,
+      aggregateConfidence: aggregateConfidence,
+    );
   }
 }
