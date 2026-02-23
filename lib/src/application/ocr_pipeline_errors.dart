@@ -57,3 +57,55 @@ class InvalidDocumentStateError extends OcrPipelineError {
   String get message =>
       'Document $documentId is in status $currentStatus, expected imported';
 }
+
+/// The PDF file could not be read (missing, corrupt, or not a valid PDF).
+class PdfUnreadableError extends OcrPipelineError {
+  const PdfUnreadableError({
+    required this.documentId,
+    required this.filePath,
+    this.reason,
+    this.cause,
+  });
+
+  /// The ID of the document whose PDF could not be read.
+  final String documentId;
+
+  /// The path to the PDF file that was unreadable.
+  final String filePath;
+
+  /// An optional description of why the file is unreadable.
+  final String? reason;
+
+  @override
+  final Object? cause;
+
+  @override
+  String get message =>
+      'PDF unreadable for document $documentId ($filePath)'
+      '${reason != null ? ': $reason' : ''}';
+}
+
+/// Rendering a PDF page to an image for OCR input failed.
+///
+/// Wraps the underlying [PdfRenderError] or other rendering exception so
+/// callers can identify which page caused the failure.
+class OcrRenderError extends OcrPipelineError {
+  const OcrRenderError({
+    required this.documentId,
+    required this.pageNumber,
+    this.cause,
+  });
+
+  /// The ID of the document being processed.
+  final String documentId;
+
+  /// The 1-based page number that failed to render.
+  final int pageNumber;
+
+  @override
+  final Object? cause;
+
+  @override
+  String get message =>
+      'Failed to render page $pageNumber of document $documentId';
+}
