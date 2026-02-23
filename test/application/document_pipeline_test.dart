@@ -11,6 +11,8 @@ import 'package:personal_archive/src/domain/pdf_metadata.dart';
 import 'package:personal_archive/src/domain/import_validation_error.dart';
 import 'package:personal_archive/src/domain/file_storage_error.dart';
 import 'package:personal_archive/src/domain/storage_error.dart';
+import 'package:personal_archive/src/domain/ocr_engine.dart';
+import 'package:personal_archive/src/application/pdf_page_image_renderer.dart';
 import 'package:flutter_test/flutter_test.dart'; // Changed from package:test
 
 
@@ -20,6 +22,8 @@ class MockPdfMetadataReader extends Mock implements PdfMetadataReader {} // This
 class MockDocumentRepository extends Mock implements DocumentRepository {}
 class MockPageRepository extends Mock implements PageRepository {}
 class MockSearchIndexSync extends Mock implements SearchIndexSync {}
+class MockOCREngine extends Mock implements OCREngine {}
+class MockPdfPageImageRenderer extends Mock implements PdfPageImageRenderer {}
 
 void main() {
   group('DocumentPipelineImpl', () {
@@ -30,6 +34,8 @@ void main() {
     late MockDocumentRepository mockDocumentRepository;
     late MockPageRepository mockPageRepository;
     late MockSearchIndexSync mockSearchIndexSync;
+    late MockOCREngine mockOcrEngine;
+    late MockPdfPageImageRenderer mockRenderer;
 
     setUp(() {
       mockValidator = MockImportValidator();
@@ -38,6 +44,8 @@ void main() {
       mockDocumentRepository = MockDocumentRepository();
       mockPageRepository = MockPageRepository();
       mockSearchIndexSync = MockSearchIndexSync();
+      mockOcrEngine = MockOCREngine();
+      mockRenderer = MockPdfPageImageRenderer();
 
       when(() => mockSearchIndexSync.syncDocument(any())).thenAnswer((_) async {});
 
@@ -48,6 +56,8 @@ void main() {
         documentRepository: mockDocumentRepository,
         pageRepository: mockPageRepository,
         searchIndexSync: mockSearchIndexSync,
+        renderer: mockRenderer,
+        ocrEngine: mockOcrEngine,
       );
       
       // Register fallback values for arguments used in `any()` or `captureAny()`

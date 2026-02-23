@@ -68,6 +68,33 @@ class SqlitePageRepository implements PageRepository {
   }
 
   @override
+  Future<void> update(Page page) {
+    return timeWriteOperation<void>(
+      logger: _logger,
+      operation: 'update_page',
+      table: 'pages',
+      recordCount: 1,
+      action: () => _db.execute(
+        '''
+        UPDATE pages
+        SET raw_text = ?,
+            processed_text = ?,
+            ocr_confidence = ?
+        WHERE id = ?
+        ''',
+        [
+          page.rawText,
+          page.processedText,
+          page.ocrConfidence,
+          page.id,
+        ],
+      ),
+    ).catchError((error, _) {
+      throw StorageUnknownError(error);
+    });
+  }
+
+  @override
   Future<List<Page>> findByDocumentId(String documentId) async {
     try {
       final rows = await timeReadOperation<List<Map<String, Object?>>>(

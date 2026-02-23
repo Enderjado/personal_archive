@@ -12,10 +12,29 @@ import 'package:personal_archive/infrastructure/file_storage/local_document_file
 import 'package:personal_archive/infrastructure/pdf/pdf_metadata_reader_impl.dart';
 import 'package:personal_archive/src/application/document_pipeline_impl.dart';
 import 'package:personal_archive/src/application/import_validator.dart';
+import 'package:personal_archive/src/application/pdf_page_image_renderer.dart';
 import 'package:personal_archive/src/domain/domain.dart';
+import 'package:personal_archive/src/domain/ocr_engine.dart';
+import 'package:personal_archive/src/domain/ocr_types.dart';
 
 import '../helpers/test_database.dart';
 import '../helpers/test_storage.dart';
+
+/// Stub [PdfPageImageRenderer] for import-only integration tests.
+class _StubRenderer implements PdfPageImageRenderer {
+  @override
+  Future<OcrInput> renderPage(String pdfPath, int pageNumber) {
+    throw UnimplementedError('Not used in import tests');
+  }
+}
+
+/// Stub [OCREngine] for import-only integration tests.
+class _StubOcrEngine implements OCREngine {
+  @override
+  Future<OcrPageResult> extractText(OcrInput input) {
+    throw UnimplementedError('Not used in import tests');
+  }
+}
 
 void main() {
   late Directory storageDir;
@@ -62,6 +81,8 @@ void main() {
         documentRepository: documentRepo,
         pageRepository: pageRepo,
         searchIndexSync: ftsSync,
+        renderer: _StubRenderer(),
+        ocrEngine: _StubOcrEngine(),
       );
 
       // Create a temporary input file from assets
@@ -131,6 +152,8 @@ void main() {
         documentRepository: documentRepo,
         pageRepository: pageRepo,
         searchIndexSync: ftsSync,
+        renderer: _StubRenderer(),
+        ocrEngine: _StubOcrEngine(),
       );
 
       // Create a dummy file that is NOT a PDF to trigger a validation error or processing error

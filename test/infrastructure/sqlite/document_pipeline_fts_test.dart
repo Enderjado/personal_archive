@@ -8,6 +8,8 @@ import 'package:personal_archive/src/application/document_pipeline_impl.dart';
 import 'package:personal_archive/src/application/import_validator.dart';
 import 'package:personal_archive/src/application/pdf_metadata_reader.dart';
 import 'package:personal_archive/src/domain/document_file_storage.dart';
+import 'package:personal_archive/src/domain/ocr_engine.dart';
+import 'package:personal_archive/src/application/pdf_page_image_renderer.dart';
 import 'package:personal_archive/src/domain/pdf_metadata.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -16,6 +18,8 @@ import 'sqlite_test_harness.dart';
 class MockImportValidator extends Mock implements ImportValidator {}
 class MockDocumentFileStorage extends Mock implements DocumentFileStorage {}
 class MockPdfMetadataReader extends Mock implements PdfMetadataReader {}
+class MockOCREngine extends Mock implements OCREngine {}
+class MockPdfPageImageRenderer extends Mock implements PdfPageImageRenderer {}
 
 void main() {
   late sqlite.Database rawDb;
@@ -58,6 +62,8 @@ void main() {
       documentRepository: docRepo,
       pageRepository: pageRepo,
       searchIndexSync: ftsSync,
+      renderer: MockPdfPageImageRenderer(),
+      ocrEngine: MockOCREngine(),
     );
   });
 
