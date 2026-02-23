@@ -88,12 +88,25 @@ static fire_and_forget HandleRecognizeText(flutter::EncodableMap args,
     co_return;
   }
 
-  // TODO: invoke OcrEngine::RecognizeAsync in the next commit.
-  // For now, return an empty result to confirm image loading works.
+  auto engine = Windows::Media::Ocr::OcrEngine::TryCreateFromUserProfileLanguages();
+  if (!engine) {
+    co_await ui_thread;
+    result->Error("OCR_UNAVAILABLE",
+                  "No OCR engine available for the current user languages");
+    co_return;
+  }
+
+  auto ocr_result = co_await engine.RecognizeAsync(bitmap);
+
+  auto text = to_string(ocr_result.Text());
+
+  // Windows.Media.Ocr does not expose a per-result confidence score.
   co_await ui_thread;
   flutter::EncodableMap response;
-  response[flutter::EncodableValue("text")] = flutter::EncodableValue("");
-  response[flutter::EncodableValue("confidence")] = flutter::EncodableValue();
+  response[flutter::EncodableValue("text")] =
+      flutter::EncodableValue(std::move(text));
+  response[flutter::EncodableValue("confidence")] =
+      flutter::EncodableValue();
   result->Success(flutter::EncodableValue(response));
 }
 
