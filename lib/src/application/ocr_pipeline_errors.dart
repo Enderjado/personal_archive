@@ -109,3 +109,50 @@ class OcrRenderError extends OcrPipelineError {
   String get message =>
       'Failed to render page $pageNumber of document $documentId';
 }
+
+/// The OCR engine failed to extract text from a rendered page.
+///
+/// Wraps the underlying [OcrEngineError] from the domain layer so the
+/// pipeline can propagate it with document and page context.
+class OcrEnginePipelineError extends OcrPipelineError {
+  const OcrEnginePipelineError({
+    required this.documentId,
+    required this.pageNumber,
+    this.cause,
+  });
+
+  /// The ID of the document being processed.
+  final String documentId;
+
+  /// The 1-based page number whose OCR extraction failed.
+  final int pageNumber;
+
+  @override
+  final Object? cause;
+
+  @override
+  String get message =>
+      'OCR engine failed on page $pageNumber of document $documentId';
+}
+
+/// A storage operation failed during the OCR pipeline stage.
+///
+/// This wraps lower-level [StorageError] exceptions thrown by repositories
+/// (e.g. [DocumentRepository.update] or [PageRepository]) so callers can
+/// identify the failure as storage-related within the pipeline context.
+class OcrStorageError extends OcrPipelineError {
+  const OcrStorageError({
+    required this.documentId,
+    this.cause,
+  });
+
+  /// The ID of the document whose storage operation failed.
+  final String documentId;
+
+  @override
+  final Object? cause;
+
+  @override
+  String get message =>
+      'Storage operation failed for document $documentId';
+}
