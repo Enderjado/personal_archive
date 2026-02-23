@@ -11,7 +11,6 @@ add_executable(${BINARY_NAME} WIN32
   "main.cpp"
   "utils.cpp"
   "win32_window.cpp"
-  "windows_ocr_plugin.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
@@ -20,6 +19,16 @@ add_executable(${BINARY_NAME} WIN32
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})
+
+# Windows OCR plugin — compiled as a separate static library so that C++
+# exceptions (_HAS_EXCEPTIONS=1) and C++/WinRT coroutines (/await) are
+# enabled without affecting the runner's default build settings.
+add_library(windows_ocr_plugin STATIC "windows_ocr_plugin.cpp")
+target_compile_features(windows_ocr_plugin PUBLIC cxx_std_17)
+target_compile_options(windows_ocr_plugin PRIVATE /W4 /WX /wd"4100" /EHsc /await)
+target_compile_definitions(windows_ocr_plugin PRIVATE NOMINMAX)
+target_link_libraries(windows_ocr_plugin PUBLIC flutter flutter_wrapper_app "windowsapp.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE windows_ocr_plugin)
 
 # Add preprocessor definitions for the build version.
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION=\"${FLUTTER_VERSION}\"")

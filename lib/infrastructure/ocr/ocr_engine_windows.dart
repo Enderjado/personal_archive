@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:personal_archive/src/domain/ocr_engine.dart';
+import 'package:personal_archive/src/domain/ocr_error.dart';
 import 'package:personal_archive/src/domain/ocr_types.dart';
 
 /// Windows implementation of [OCREngine] backed by the WinRT
@@ -9,7 +10,8 @@ import 'package:personal_archive/src/domain/ocr_types.dart';
 /// [MethodChannel] named `personal_archive/ocr`.
 ///
 /// Supports both [FileOcrInput] (preferred — avoids copying bytes across the
-/// channel) and [MemoryOcrInput].
+/// channel) and [MemoryOcrInput]. The native side accepts any image format
+/// decodable by WIC (PNG, JPEG, BMP, TIFF, GIF, JPEG-XR).
 class WindowsOcrEngine implements OCREngine {
   /// Creates a [WindowsOcrEngine].
   ///
@@ -18,13 +20,37 @@ class WindowsOcrEngine implements OCREngine {
   WindowsOcrEngine({MethodChannel? channel})
       : _channel = channel ?? const MethodChannel('personal_archive/ocr');
 
-  // ignore: unused_field
   final MethodChannel _channel;
 
   @override
   Future<OcrPageResult> extractText(OcrInput input) async {
-    // TODO: implement once native plugin is ready
-    throw UnimplementedError('WindowsOcrEngine is not yet implemented');
+    final Map<String, dynamic> args;
+
+    if (input is FileOcrInput) {
+      args = <String, dynamic>{'filePath': input.filePath};
+    } else if (input is MemoryOcrInput) {
+      args = <String, dynamic>{'imageBytes': input.bytes};
+    } else {
+      throw OcrEngineError(
+        'Unsupported OcrInput type: ${input.runtimeType}',
+      );
+    }
+
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      'recognizeText',
+      args,
+    );
+
+    if (result == null) {
+      throw const OcrEngineError(
+        'Native OCR returned null — unexpected channel response',
+      );
+    }
+
+    final text = result['text'] as String? ?? '';
+    final confidence = result['confidence'] as double?;
+
+    return OcrPageResult(rawText: text, confidence: confidence);
   }
 }
 
