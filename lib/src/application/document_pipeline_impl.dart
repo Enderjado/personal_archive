@@ -178,60 +178,74 @@ class DocumentPipelineImpl implements DocumentPipeline {
       throw OcrStorageError(documentId: documentId, cause: e);
     }
 
-    // 3. Load pages.
-    final List<Page> pages;
+    // 3–5 are wrapped so any failure sets the document to `failed`.
     try {
-      pages = await pageRepository.findByDocumentId(documentId);
-    } on StorageError catch (e) {
-      throw OcrStorageError(documentId: documentId, cause: e);
-    }
-
-    // 4. Process each page: render → OCR → persist.
-    for (final page in pages) {
-      // 4a. Render page to image.
-      final OcrInput ocrInput;
+      // 3. Load pages.
+      final List<Page> pages;
       try {
-        ocrInput = await renderer.renderPage(document.filePath, page.pageNumber);
-      } on PdfRenderError catch (e) {
-        throw OcrRenderError(
-          documentId: documentId,
-          pageNumber: page.pageNumber,
-          cause: e,
-        );
+        pages = await pageRepository.findByDocumentId(documentId);
+      } on StorageError catch (e) {
+        throw OcrStorageError(documentId: documentId, cause: e);
       }
 
-      // 4b. Extract text via OCR engine.
-      final OcrPageResult ocrResult;
-      try {
-        ocrResult = await ocrEngine.extractText(ocrInput);
-      } on OcrError catch (e) {
-        throw OcrEnginePipelineError(
-          documentId: documentId,
-          pageNumber: page.pageNumber,
-          cause: e,
-        );
+      // 4. Process each page: render → OCR → persist.
+      for (final page in pages) {
+        // 4a. Render page to image.
+        final OcrInput ocrInput;
+        try {
+          ocrInput = await renderer.renderPage(document.filePath, page.pageNumber);
+        } on PdfRenderError catch (e) {
+          throw OcrRenderError(
+            documentId: documentId,
+            pageNumber: page.pageNumber,
+            cause: e,
+          );
+        }
+
+        // 4b. Extract text via OCR engine.
+        final OcrPageResult ocrResult;
+        try {
+          ocrResult = await ocrEngine.extractText(ocrInput);
+        } on OcrError catch (e) {
+          throw OcrEnginePipelineError(
+            documentId: documentId,
+            pageNumber: page.pageNumber,
+            cause: e,
+          );
+        }
+
+        // 4c. Persist OCR results to page.
+        try {
+          await pageRepository.update(
+            page.copyWith(
+              rawText: ocrResult.rawText,
+              ocrConfidence: ocrResult.confidence,
+            ),
+          );
+        } on StorageError catch (e) {
+          throw OcrStorageError(documentId: documentId, cause: e);
+        }
       }
 
-      // 4c. Persist OCR results to page.
+      // 5. Mark document as completed.
       try {
-        await pageRepository.update(
-          page.copyWith(
-            rawText: ocrResult.rawText,
-            ocrConfidence: ocrResult.confidence,
-          ),
+        await documentRepository.update(
+          document.copyWith(status: DocumentStatus.completed),
         );
       } on StorageError catch (e) {
         throw OcrStorageError(documentId: documentId, cause: e);
       }
-    }
-
-    // 5. Mark document as completed.
-    try {
-      await documentRepository.update(
-        document.copyWith(status: DocumentStatus.completed),
-      );
-    } on StorageError catch (e) {
-      throw OcrStorageError(documentId: documentId, cause: e);
+    } on OcrPipelineError {
+      // Set document status to failed before propagating the error.
+      try {
+        await documentRepository.update(
+          document.copyWith(status: DocumentStatus.failed),
+        );
+      } catch (_) {
+        // Best-effort: if the status update itself fails, still rethrow
+        // the original error so the caller knows what went wrong.
+      }
+      rethrow;
     }
 
     // 6. Sync search index (best-effort).
