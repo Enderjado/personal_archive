@@ -1,4 +1,5 @@
 import '../domain/document.dart';
+import 'ocr_result.dart';
 
 /// Result of a successful document import.
 class ImportResult {
@@ -39,15 +40,18 @@ abstract class DocumentPipeline {
   /// Runs OCR processing for the document with the given [documentId].
   ///
   /// The document must exist and be in [DocumentStatus.imported] status.
-  /// Renders each page to an image, extracts text via OCR, and persists
-  /// the results.
+  /// Each page is rendered to an image, passed to the OCR engine, and the
+  /// extracted text and confidence score are persisted. The full-text search
+  /// index is updated on success.
+  ///
+  /// Returns an [OcrResult] carrying [OcrResult.pageCount] and the
+  /// arithmetic-mean [OcrResult.aggregateConfidence] across all pages.
   ///
   /// Throws [OcrPipelineError] subtypes on failure:
   /// - [DocumentNotFoundError] if the document does not exist.
   /// - [InvalidDocumentStateError] if the document is not in `imported` status.
-  /// - [PdfUnreadableError] if the PDF file cannot be read.
   /// - [OcrRenderError] if a page fails to render.
   /// - [OcrEnginePipelineError] if OCR text extraction fails.
   /// - [OcrStorageError] if a storage operation fails during processing.
-  Future<void> runOcrForDocument(String documentId);
+  Future<OcrResult> runOcrForDocument(String documentId);
 }

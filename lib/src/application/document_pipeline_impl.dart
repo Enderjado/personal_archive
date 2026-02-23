@@ -14,6 +14,7 @@ import '../domain/ocr_types.dart';
 import 'document_pipeline.dart';
 import 'import_validator.dart';
 import 'ocr_pipeline_errors.dart';
+import 'ocr_result.dart';
 import 'pdf_metadata_reader.dart';
 import 'pdf_page_image_renderer.dart';
 import 'search_index_sync.dart';
@@ -156,7 +157,7 @@ class DocumentPipelineImpl implements DocumentPipeline {
   }
 
   @override
-  Future<void> runOcrForDocument(String documentId) async {
+  Future<OcrResult> runOcrForDocument(String documentId) async {
     // 1. Load document and validate state.
     final document = await documentRepository.findById(documentId);
     if (document == null) {
@@ -178,7 +179,10 @@ class DocumentPipelineImpl implements DocumentPipeline {
       throw OcrStorageError(documentId: documentId, cause: e);
     }
 
-    // 3–5 are wrapped so any failure sets the document to `failed`.
+    // 3–6 are wrapped so any failure sets the document to `failed`.
+    // pageCount is hoisted so the return value at the end of the method can
+    // reference it even though `pages` is scoped inside the try block.
+    var pageCount = 0;
     try {
       // 3. Load pages.
       final List<Page> pages;
@@ -187,6 +191,7 @@ class DocumentPipelineImpl implements DocumentPipeline {
       } on StorageError catch (e) {
         throw OcrStorageError(documentId: documentId, cause: e);
       }
+      pageCount = pages.length;
 
       // 4. Process each page: render → OCR → persist.
       for (final page in pages) {
@@ -254,5 +259,8 @@ class DocumentPipelineImpl implements DocumentPipeline {
     } catch (_) {
       // Search sync failure is non-fatal.
     }
+
+    // NOTE: aggregateConfidence is computed in a later commit (6.8).
+    return OcrResult(documentId: documentId, pageCount: pageCount);
   }
 }
