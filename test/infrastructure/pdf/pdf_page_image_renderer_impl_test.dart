@@ -4,8 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_archive/infrastructure/pdf/pdf_page_image_renderer_impl.dart';
 import 'package:personal_archive/src/application/pdf_page_image_renderer.dart';
+import 'package:personal_archive/src/domain/ocr_config.dart';
 import 'package:personal_archive/src/domain/ocr_types.dart';
-import 'package:personal_archive/src/domain/render_configuration.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -130,15 +130,35 @@ void main() {
   });
 
   group('PdfPageImageRendererImpl – configuration', () {
-    test('accepts custom RenderConfiguration', () {
-      final config = RenderConfiguration(dpi: 150);
+    test('accepts custom OcrConfig', () {
+      final config = OcrConfig(dpi: 150);
       final renderer = PdfPageImageRendererImpl(config: config);
       // Renderer should be created without errors
       expect(renderer, isNotNull);
     });
 
-    test('uses default RenderConfiguration when none provided', () {
+    test('uses default OcrConfig when none provided', () {
       final renderer = PdfPageImageRendererImpl();
+      expect(renderer, isNotNull);
+    });
+  });
+
+  group('OcrConfig override', () {
+    test('accepts custom tempDir', () {
+      final config = OcrConfig(tempDir: '/custom/temp/dir');
+      final renderer = PdfPageImageRendererImpl(config: config);
+      expect(renderer, isNotNull);
+    });
+
+    test('accepts custom languageHints', () {
+      final config = OcrConfig(languageHints: ['en', 'de']);
+      final renderer = PdfPageImageRendererImpl(config: config);
+      expect(renderer, isNotNull);
+    });
+
+    test('accepts custom timeoutPerPage', () {
+      final config = OcrConfig(timeoutPerPage: const Duration(seconds: 30));
+      final renderer = PdfPageImageRendererImpl(config: config);
       expect(renderer, isNotNull);
     });
   });
