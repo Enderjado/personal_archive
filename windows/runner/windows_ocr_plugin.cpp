@@ -74,6 +74,7 @@ static fire_and_forget HandleRecognizeText(flutter::EncodableMap args,
   }
 
   SoftwareBitmap bitmap{nullptr};
+  std::string load_error;
   try {
     if (has_file) {
       bitmap = co_await LoadBitmapFromFile(
@@ -83,8 +84,11 @@ static fire_and_forget HandleRecognizeText(flutter::EncodableMap args,
           std::get<std::vector<uint8_t>>(bytes_it->second));
     }
   } catch (const hresult_error& e) {
+    load_error = to_string(e.message());
+  }
+  if (!load_error.empty()) {
     co_await ui_thread;
-    result->Error("IMAGE_LOAD_FAILED", to_string(e.message()));
+    result->Error("IMAGE_LOAD_FAILED", load_error);
     co_return;
   }
 
@@ -96,6 +100,7 @@ static fire_and_forget HandleRecognizeText(flutter::EncodableMap args,
     co_return;
   }
 
+  std::string ocr_error;
   try {
     auto ocr_result = co_await engine.RecognizeAsync(bitmap);
 
@@ -110,9 +115,11 @@ static fire_and_forget HandleRecognizeText(flutter::EncodableMap args,
         flutter::EncodableValue();
     result->Success(flutter::EncodableValue(response));
   } catch (const hresult_error& e) {
+    ocr_error = "Text recognition failed: " + to_string(e.message());
+  }
+  if (!ocr_error.empty()) {
     co_await ui_thread;
-    result->Error("OCR_FAILED",
-                  "Text recognition failed: " + to_string(e.message()));
+    result->Error("OCR_FAILED", ocr_error);
   }
 }
 
