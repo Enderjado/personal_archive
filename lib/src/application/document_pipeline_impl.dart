@@ -8,9 +8,14 @@ import '../domain/page_repository.dart';
 import '../domain/file_storage_error.dart';
 import '../domain/storage_error.dart';
 import '../domain/pdf_metadata.dart';
+import '../domain/ocr_engine.dart';
+import '../domain/ocr_error.dart';
+import '../domain/ocr_types.dart';
 import 'document_pipeline.dart';
 import 'import_validator.dart';
+import 'ocr_pipeline_errors.dart';
 import 'pdf_metadata_reader.dart';
+import 'pdf_page_image_renderer.dart';
 import 'search_index_sync.dart';
 
 /// Concrete implementation of the [DocumentPipeline].
@@ -22,6 +27,8 @@ class DocumentPipelineImpl implements DocumentPipeline {
     required this.documentRepository,
     required this.pageRepository,
     required this.searchIndexSync,
+    required this.renderer,
+    required this.ocrEngine,
   });
 
   final ImportValidator validator;
@@ -30,6 +37,8 @@ class DocumentPipelineImpl implements DocumentPipeline {
   final DocumentRepository documentRepository;
   final PageRepository pageRepository;
   final SearchIndexSync searchIndexSync;
+  final PdfPageImageRenderer renderer;
+  final OCREngine ocrEngine;
 
   @override
   Future<ImportResult> importFromPath(String sourcePath) async {
@@ -143,6 +152,107 @@ class DocumentPipelineImpl implements DocumentPipeline {
     } catch (e) {
       // In a real app, use a logger service here.
       // print('Failed to cleanup file for document $documentId: $e');
+    }
+  }
+
+  @override
+  Future<void> runOcrForDocument(String documentId) async {
+    // 1. Load document and validate state.
+    final document = await documentRepository.findById(documentId);
+    if (document == null) {
+      throw DocumentNotFoundError(documentId);
+    }
+    if (document.status != DocumentStatus.imported) {
+      throw InvalidDocumentStateError(
+        documentId: documentId,
+        currentStatus: document.status,
+      );
+    }
+
+    // 2. Transition to processing.
+    try {
+      await documentRepository.update(
+        document.copyWith(status: DocumentStatus.processing),
+      );
+    } on StorageError catch (e) {
+      throw OcrStorageError(documentId: documentId, cause: e);
+    }
+
+    // 3–5 are wrapped so any failure sets the document to `failed`.
+    try {
+      // 3. Load pages.
+      final List<Page> pages;
+      try {
+        pages = await pageRepository.findByDocumentId(documentId);
+      } on StorageError catch (e) {
+        throw OcrStorageError(documentId: documentId, cause: e);
+      }
+
+      // 4. Process each page: render → OCR → persist.
+      for (final page in pages) {
+        // 4a. Render page to image.
+        final OcrInput ocrInput;
+        try {
+          ocrInput = await renderer.renderPage(document.filePath, page.pageNumber);
+        } on PdfRenderError catch (e) {
+          throw OcrRenderError(
+            documentId: documentId,
+            pageNumber: page.pageNumber,
+            cause: e,
+          );
+        }
+
+        // 4b. Extract text via OCR engine.
+        final OcrPageResult ocrResult;
+        try {
+          ocrResult = await ocrEngine.extractText(ocrInput);
+        } on OcrError catch (e) {
+          throw OcrEnginePipelineError(
+            documentId: documentId,
+            pageNumber: page.pageNumber,
+            cause: e,
+          );
+        }
+
+        // 4c. Persist OCR results to page.
+        try {
+          await pageRepository.update(
+            page.copyWith(
+              rawText: ocrResult.rawText,
+              ocrConfidence: ocrResult.confidence,
+            ),
+          );
+        } on StorageError catch (e) {
+          throw OcrStorageError(documentId: documentId, cause: e);
+        }
+      }
+
+      // 5. Mark document as completed.
+      try {
+        await documentRepository.update(
+          document.copyWith(status: DocumentStatus.completed),
+        );
+      } on StorageError catch (e) {
+        throw OcrStorageError(documentId: documentId, cause: e);
+      }
+    } on OcrPipelineError {
+      // Set document status to failed before propagating the error.
+      try {
+        await documentRepository.update(
+          document.copyWith(status: DocumentStatus.failed),
+        );
+      } catch (_) {
+        // Best-effort: if the status update itself fails, still rethrow
+        // the original error so the caller knows what went wrong.
+      }
+      rethrow;
+    }
+
+    // 6. Sync search index (best-effort).
+    try {
+      await searchIndexSync.syncDocument(documentId);
+    } catch (_) {
+      // Search sync failure is non-fatal.
     }
   }
 }

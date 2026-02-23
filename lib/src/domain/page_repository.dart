@@ -7,6 +7,9 @@ abstract class PageRepository {
   /// (e.g. foreign key violation if document does not exist).
   Future<void> insertAll(List<Page> pages);
 
+  /// Updates an existing page. Throws [StorageError] on failure.
+  Future<void> update(Page page);
+
   /// Returns pages for the given [documentId], ordered by [Page.pageNumber] ascending.
   /// Returns an empty list if the document has no pages.
   Future<List<Page>> findByDocumentId(String documentId);
