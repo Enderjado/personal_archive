@@ -190,5 +190,87 @@ void main() {
       expect(result, isNotNull);
       expect(result, isEmpty);
     });
+
+    test(
+      'update persists rawText and ocrConfidence against real schema',
+      () async {
+        const documentId = 'doc-for-update-integration';
+        final epoch = DateTime.now().toUtc().millisecondsSinceEpoch;
+
+        await db.execute(
+          '''
+          INSERT INTO documents (
+            id, title, file_path, status, confidence_score,
+            place_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            documentId,
+            'Integration Doc',
+            '/path/doc.pdf',
+            DocumentStatus.imported.name,
+            null,
+            null,
+            epoch,
+            epoch,
+          ],
+        );
+
+        final original = Page(
+          id: 'page-integration-update',
+          documentId: documentId,
+          pageNumber: 1,
+          rawText: null,
+          processedText: null,
+          ocrConfidence: null,
+        );
+        await repo.insertAll([original]);
+
+        final updated = Page(
+          id: original.id,
+          documentId: original.documentId,
+          pageNumber: original.pageNumber,
+          rawText: 'ocr extracted text',
+          processedText: null,
+          ocrConfidence: 0.88,
+        );
+        await repo.update(updated);
+
+        final found = await repo.findByDocumentId(documentId);
+        expect(found, hasLength(1));
+
+        final result = found.first;
+        expect(result.rawText, 'ocr extracted text');
+        expect(result.ocrConfidence, closeTo(0.88, 1e-9));
+        expect(result.id, original.id);
+        expect(result.documentId, original.documentId);
+        expect(result.pageNumber, original.pageNumber);
+      },
+    );
+
+    test(
+      'update throws StorageNotFoundError for non-existent page against real schema',
+      () async {
+        final ghost = Page(
+          id: 'integration-ghost-page',
+          documentId: 'any-doc',
+          pageNumber: 1,
+          rawText: 'text',
+          processedText: null,
+          ocrConfidence: 0.9,
+        );
+
+        await expectLater(
+          () => repo.update(ghost),
+          throwsA(
+            isA<StorageNotFoundError>().having(
+              (e) => e.id,
+              'id',
+              ghost.id,
+            ),
+          ),
+        );
+      },
+    );
   });
 }
