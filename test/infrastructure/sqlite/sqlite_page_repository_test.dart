@@ -207,6 +207,31 @@ void main() {
         expect(result.pageNumber, original.pageNumber);
       },
     );
+
+    test(
+      'update throws StorageNotFoundError when page does not exist',
+      () async {
+        final ghost = Page(
+          id: 'non-existent-page',
+          documentId: 'any-doc',
+          pageNumber: 1,
+          rawText: 'text',
+          processedText: null,
+          ocrConfidence: 0.9,
+        );
+
+        await expectLater(
+          () => repo.update(ghost),
+          throwsA(
+            isA<StorageNotFoundError>().having(
+              (e) => e.id,
+              'id',
+              ghost.id,
+            ),
+          ),
+        );
+      },
+    );
   });
 }
 
