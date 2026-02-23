@@ -10,6 +10,10 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // Register app-level plugins that are not auto-generated.
+    let registrar = flutterViewController.registrar(forPlugin: "VisionOcrPlugin")
+    VisionOcrPlugin.register(with: registrar)
+
     super.awakeFromNib()
   }
 }
