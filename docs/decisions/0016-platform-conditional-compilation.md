@@ -57,3 +57,81 @@ We will use **conditional imports** (also known as "stubbing") to isolate platfo
 - **Build Safety**: Prevents "symbol not found" errors during linking/compilation.
 - **Maintainability**: Clear separation of platform logic.
 - **Testing**: Allows easy injection of a mock engine for unit tests without loading native libraries.
+
+## Addendum — macOS Vision OCR Implementation (2026-02-23)
+
+The first concrete platform adapter has been implemented following the strategy
+above. This section records the details for future maintainers.
+
+### Method Channel Contract
+
+| Property | Value |
+|---|---|
+| Channel name | `personal_archive/ocr` |
+| Method | `recognizeText` |
+
+**Arguments** (map — exactly one of the two keys must be present):
+
+| Key | Type | Description |
+|---|---|---|
+| `filePath` | `String` | Absolute path to an image file on disk. Preferred for large images to avoid copying bytes across the channel boundary. |
+| `imageBytes` | `Uint8List` (via `FlutterStandardTypedData`) | Raw image bytes (PNG, JPEG, TIFF, or any format `CGImageSource` can decode). |
+
+**Return value** (map):
+
+| Key | Type | Description |
+|---|---|---|
+| `text` | `String` | Concatenated recognised text, observations joined by `\n`. Empty string if no text was found. |
+| `confidence` | `Double?` | Mean per-observation confidence (0.0–1.0), or `null` when no observations were produced. |
+
+**Error codes** (returned as `FlutterError`):
+
+| Code | Meaning |
+|---|---|
+| `INVALID_ARGUMENTS` | Neither or both of `filePath`/`imageBytes` supplied, or arguments are not a map. |
+| `IMAGE_LOAD_FAILED` | The image could not be decoded to a `CGImage`. |
+| `OCR_FAILED` | `VNRecognizeTextRequest` or its handler failed. |
+
+### Native Implementation (`macos/Runner/VisionOcrPlugin.swift`)
+
+- Registers on the channel in `MainFlutterWindow.awakeFromNib()` via
+  `VisionOcrPlugin.register(with:)`.
+- Uses `VNRecognizeTextRequest` with `recognitionLevel = .accurate` and
+  `usesLanguageCorrection = true`.
+- Vision work is dispatched to `DispatchQueue.global(qos: .userInitiated)`;
+  results are returned on the main thread as required by Flutter.
+- Supported image formats: anything `CGImageSourceCreateWithURL` /
+  `CGImageSourceCreateWithData` can load — PNG, JPEG, TIFF, BMP, GIF, HEIF.
+
+### Deployment Target
+
+The macOS deployment target is **10.15** (Catalina), which is the minimum
+version supporting `VNRecognizeTextRequest`. No additional capability
+entitlements are required.
+
+### Dart Adapter (`lib/infrastructure/ocr/ocr_engine_macos.dart`)
+
+- `MacOSOcrEngine` implements `OCREngine`.
+- Accepts an optional `MethodChannel` in the constructor for test injection.
+- Maps `FileOcrInput` → `filePath` argument, `MemoryOcrInput` → `imageBytes`
+  argument.
+- Catches `PlatformException` and rethrows as `OcrEngineError` with the
+  original exception attached.
+
+### Conditional Import Wiring
+
+```
+ocr_engine_factory.dart          ← public entry point
+  └─ exports ocr_engine_stub.dart        (fallback — throws OcrEngineError)
+     if (dart.library.io) ocr_engine_io.dart
+       └─ checks Platform.isMacOS at runtime
+          └─ delegates to ocr_engine_macos.dart → MacOSOcrEngine
+```
+
+### Recommended OcrInput Strategy
+
+For large images (e.g. rendered PDF pages at 300 DPI), prefer `FileOcrInput`
+over `MemoryOcrInput` to avoid copying megabytes of pixel data across the
+method-channel boundary. `PdfPageImageRendererImpl` currently produces
+`MemoryOcrInput`; a future optimisation could write to a temp file and use
+`FileOcrInput` instead.
