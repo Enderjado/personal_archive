@@ -36,21 +36,28 @@ class WindowsOcrEngine implements OCREngine {
       );
     }
 
-    final result = await _channel.invokeMapMethod<String, dynamic>(
-      'recognizeText',
-      args,
-    );
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        'recognizeText',
+        args,
+      );
 
-    if (result == null) {
-      throw const OcrEngineError(
-        'Native OCR returned null — unexpected channel response',
+      if (result == null) {
+        throw const OcrEngineError(
+          'Native OCR returned null — unexpected channel response',
+        );
+      }
+
+      final text = result['text'] as String? ?? '';
+      final confidence = result['confidence'] as double?;
+
+      return OcrPageResult(rawText: text, confidence: confidence);
+    } on PlatformException catch (e) {
+      throw OcrEngineError(
+        e.message ?? 'Unknown platform error during OCR',
+        e,
       );
     }
-
-    final text = result['text'] as String? ?? '';
-    final confidence = result['confidence'] as double?;
-
-    return OcrPageResult(rawText: text, confidence: confidence);
   }
 }
 

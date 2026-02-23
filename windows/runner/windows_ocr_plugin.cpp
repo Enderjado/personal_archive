@@ -96,18 +96,24 @@ static fire_and_forget HandleRecognizeText(flutter::EncodableMap args,
     co_return;
   }
 
-  auto ocr_result = co_await engine.RecognizeAsync(bitmap);
+  try {
+    auto ocr_result = co_await engine.RecognizeAsync(bitmap);
 
-  auto text = to_string(ocr_result.Text());
+    auto text = to_string(ocr_result.Text());
 
-  // Windows.Media.Ocr does not expose a per-result confidence score.
-  co_await ui_thread;
-  flutter::EncodableMap response;
-  response[flutter::EncodableValue("text")] =
-      flutter::EncodableValue(std::move(text));
-  response[flutter::EncodableValue("confidence")] =
-      flutter::EncodableValue();
-  result->Success(flutter::EncodableValue(response));
+    // Windows.Media.Ocr does not expose a per-result confidence score.
+    co_await ui_thread;
+    flutter::EncodableMap response;
+    response[flutter::EncodableValue("text")] =
+        flutter::EncodableValue(std::move(text));
+    response[flutter::EncodableValue("confidence")] =
+        flutter::EncodableValue();
+    result->Success(flutter::EncodableValue(response));
+  } catch (const hresult_error& e) {
+    co_await ui_thread;
+    result->Error("OCR_FAILED",
+                  "Text recognition failed: " + to_string(e.message()));
+  }
 }
 
 static void HandleMethodCall(
