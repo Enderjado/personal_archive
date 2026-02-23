@@ -11,6 +11,7 @@ export 'import_configuration.dart';
 export 'import_validation_error.dart';
 export 'keyword.dart';
 export 'keyword_repository.dart';
+export 'ocr_config.dart';
 export 'ocr_engine.dart';
 export 'ocr_error.dart';
 export 'ocr_types.dart';
