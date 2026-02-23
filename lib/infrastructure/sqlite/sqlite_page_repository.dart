@@ -74,22 +74,30 @@ class SqlitePageRepository implements PageRepository {
       operation: 'update_page',
       table: 'pages',
       recordCount: 1,
-      action: () => _db.execute(
-        '''
-        UPDATE pages
-        SET raw_text = ?,
-            processed_text = ?,
-            ocr_confidence = ?
-        WHERE id = ?
-        ''',
-        [
-          page.rawText,
-          page.processedText,
-          page.ocrConfidence,
-          page.id,
-        ],
-      ),
-    ).catchError((error, _) {
+      action: () async {
+        await _db.execute(
+          '''
+          UPDATE pages
+          SET raw_text = ?,
+              processed_text = ?,
+              ocr_confidence = ?
+          WHERE id = ?
+          ''',
+          [
+            page.rawText,
+            page.processedText,
+            page.ocrConfidence,
+            page.id,
+          ],
+        );
+        final rows = await _db.query('SELECT changes() AS count');
+        final affected = rows.firstOrNull?['count'] as int? ?? 0;
+        if (affected == 0) {
+          throw StorageNotFoundError(resource: 'Page', id: page.id);
+        }
+      },
+    ).catchError((Object error, StackTrace _) {
+      if (error is StorageError) throw error;
       throw StorageUnknownError(error);
     });
   }

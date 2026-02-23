@@ -149,6 +149,89 @@ void main() {
         );
       },
     );
+
+    test(
+      'update persists rawText and ocrConfidence while leaving id, documentId, and pageNumber unchanged',
+      () async {
+        const documentId = 'doc-for-update';
+
+        await db.execute(
+          '''
+          INSERT INTO documents (
+            id, title, file_path, status, confidence_score,
+            place_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            documentId,
+            'Doc Title',
+            '/path/to/doc.pdf',
+            DocumentStatus.imported.name,
+            null,
+            null,
+            0,
+            0,
+          ],
+        );
+
+        final original = Page(
+          id: 'page-to-update',
+          documentId: documentId,
+          pageNumber: 1,
+          rawText: null,
+          processedText: null,
+          ocrConfidence: null,
+        );
+        await repo.insertAll([original]);
+
+        final updated = Page(
+          id: original.id,
+          documentId: original.documentId,
+          pageNumber: original.pageNumber,
+          rawText: 'extracted text',
+          processedText: null,
+          ocrConfidence: 0.95,
+        );
+        await repo.update(updated);
+
+        final found = await repo.findByDocumentId(documentId);
+        expect(found, hasLength(1));
+
+        final result = found.first;
+        // Mutable fields changed.
+        expect(result.rawText, 'extracted text');
+        expect(result.ocrConfidence, closeTo(0.95, 1e-9));
+        // Immutable fields untouched.
+        expect(result.id, original.id);
+        expect(result.documentId, original.documentId);
+        expect(result.pageNumber, original.pageNumber);
+      },
+    );
+
+    test(
+      'update throws StorageNotFoundError when page does not exist',
+      () async {
+        final ghost = Page(
+          id: 'non-existent-page',
+          documentId: 'any-doc',
+          pageNumber: 1,
+          rawText: 'text',
+          processedText: null,
+          ocrConfidence: 0.9,
+        );
+
+        await expectLater(
+          () => repo.update(ghost),
+          throwsA(
+            isA<StorageNotFoundError>().having(
+              (e) => e.id,
+              'id',
+              ghost.id,
+            ),
+          ),
+        );
+      },
+    );
   });
 }
 
