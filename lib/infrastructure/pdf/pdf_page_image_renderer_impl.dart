@@ -1,8 +1,8 @@
 import 'package:pdfx/pdfx.dart';
 
 import '../../src/application/pdf_page_image_renderer.dart';
+import '../../src/domain/ocr_config.dart';
 import '../../src/domain/ocr_types.dart';
-import '../../src/domain/render_configuration.dart';
 
 /// The base resolution of a PDF page in points-per-inch.
 const double _pdfBaseDpi = 72.0;
@@ -25,13 +25,13 @@ const double _pdfBaseDpi = 72.0;
 /// via `try`/`finally`). The renderer itself guarantees no unbounded temp-file
 /// growth across a multi-page run.
 class PdfPageImageRendererImpl implements PdfPageImageRenderer {
-  /// Creates a renderer with the given [RenderConfiguration].
+  /// Creates a renderer with the given [OcrConfig].
   ///
-  /// Defaults to 300 DPI (via [RenderConfiguration] defaults).
-  PdfPageImageRendererImpl({RenderConfiguration? config})
-      : _config = config ?? const RenderConfiguration();
+  /// Defaults to 300 DPI (via [OcrConfig] defaults).
+  PdfPageImageRendererImpl({OcrConfig? config})
+      : _config = config ?? const OcrConfig();
 
-  final RenderConfiguration _config;
+  final OcrConfig _config;
 
   @override
   Future<OcrInput> renderPage(String pdfPath, int pageNumber) async {

@@ -1,7 +1,7 @@
 import 'package:personal_archive/infrastructure/pdf/pdf_metadata_reader_impl.dart';
 import 'package:personal_archive/infrastructure/pdf/pdf_page_image_renderer_impl.dart';
 import 'package:personal_archive/src/application/application.dart';
-import 'package:personal_archive/src/domain/render_configuration.dart';
+import 'package:personal_archive/src/domain/ocr_config.dart';
 
 /// Simple service locator for dependency injection.
 ///
@@ -15,7 +15,7 @@ class ServiceLocator {
   PdfMetadataReader? _pdfMetadataReader;
   PdfPageImageRenderer? _pdfPageImageRenderer;
   ImportValidator? _importValidator;
-  RenderConfiguration _renderConfiguration = const RenderConfiguration();
+  OcrConfig _ocrConfig = const OcrConfig();
 
   /// Returns the registered [PdfMetadataReader] implementation.
   PdfMetadataReader get pdfMetadataReader {
@@ -30,7 +30,7 @@ class ServiceLocator {
   /// Returns the registered [PdfPageImageRenderer] implementation.
   PdfPageImageRenderer get pdfPageImageRenderer {
     return _pdfPageImageRenderer ??= PdfPageImageRendererImpl(
-      config: _renderConfiguration,
+      config: _ocrConfig,
     );
   }
 
@@ -39,15 +39,15 @@ class ServiceLocator {
     _pdfPageImageRenderer = renderer;
   }
 
-  /// Returns the current [RenderConfiguration].
-  RenderConfiguration get renderConfiguration => _renderConfiguration;
+  /// Returns the current [OcrConfig].
+  OcrConfig get ocrConfig => _ocrConfig;
 
-  /// Overrides the [RenderConfiguration].
+  /// Overrides the [OcrConfig].
   ///
   /// If a [PdfPageImageRenderer] has already been created, it will continue
   /// using the old configuration. Reset the renderer to pick up changes.
-  set renderConfiguration(RenderConfiguration config) {
-    _renderConfiguration = config;
+  set ocrConfig(OcrConfig config) {
+    _ocrConfig = config;
     _pdfPageImageRenderer = null; // force re-creation with new config
   }
 
@@ -68,6 +68,6 @@ class ServiceLocator {
     _pdfMetadataReader = null;
     _pdfPageImageRenderer = null;
     _importValidator = null;
-    _renderConfiguration = const RenderConfiguration();
+    _ocrConfig = const OcrConfig();
   }
 }
