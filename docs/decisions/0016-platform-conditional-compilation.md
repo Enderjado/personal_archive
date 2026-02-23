@@ -124,8 +124,9 @@ entitlements are required.
 ocr_engine_factory.dart          ← public entry point
   └─ exports ocr_engine_stub.dart        (fallback — throws OcrEngineError)
      if (dart.library.io) ocr_engine_io.dart
-       └─ checks Platform.isMacOS at runtime
-          └─ delegates to ocr_engine_macos.dart → MacOSOcrEngine
+       ├─ Platform.isMacOS  → ocr_engine_macos.dart  → MacOSOcrEngine
+       ├─ Platform.isWindows → ocr_engine_windows.dart → WindowsOcrEngine
+       └─ otherwise          → throws OcrEngineError
 ```
 
 ### Recommended OcrInput Strategy
@@ -135,3 +136,81 @@ over `MemoryOcrInput` to avoid copying megabytes of pixel data across the
 method-channel boundary. `PdfPageImageRendererImpl` currently produces
 `MemoryOcrInput`; a future optimisation could write to a temp file and use
 `FileOcrInput` instead.
+
+## Addendum — Windows OCR Implementation (2026-02-23)
+
+The second platform adapter has been implemented following the same strategy.
+
+### WinRT API
+
+| Property | Value |
+|---|---|
+| API | `Windows.Media.Ocr.OcrEngine` (WinRT) |
+| Binding | C++/WinRT projections shipped with the Windows SDK |
+| Engine creation | `OcrEngine::TryCreateFromUserProfileLanguages()` |
+| Recognition | `OcrEngine::RecognizeAsync(SoftwareBitmap)` |
+
+The OCR engine uses language packs installed on the user's system.
+`TryCreateFromUserProfileLanguages()` returns `nullptr` when no suitable
+language pack is available; this is surfaced as an `OCR_UNAVAILABLE` error.
+
+### Method Channel Contract
+
+Shares the same channel (`personal_archive/ocr`) and `recognizeText` method
+as macOS. The argument and return-value schemas are identical (see macOS
+addendum above).
+
+**Additional error code** (returned as `FlutterError`):
+
+| Code | Meaning |
+|---|---|
+| `OCR_UNAVAILABLE` | `TryCreateFromUserProfileLanguages()` returned `nullptr` — no language pack installed. |
+
+### Confidence
+
+The `Windows.Media.Ocr` API does **not** expose a confidence score.
+`OcrPageResult.confidence` is always `null` on Windows.
+
+### Native Implementation (`windows/runner/windows_ocr_plugin.cpp`)
+
+- Registered in `FlutterWindow::OnCreate()` via `WindowsOcrPluginRegister()`.
+- Compiled as a **separate CMake static library** (`windows_ocr_plugin`) to
+  enable C++ exceptions and C++/WinRT coroutine support (`/await`) without
+  affecting the runner's default build settings (which disable STL exceptions
+  via `_HAS_EXCEPTIONS=0`).
+- Links `windowsapp.lib` for WinRT imports.
+- Image loading uses `BitmapDecoder` (backed by WIC) → `SoftwareBitmap`
+  in `Bgra8` pixel format, which `OcrEngine::RecognizeAsync` requires.
+- Async work (`co_await`) runs on the WinRT thread pool; results are
+  dispatched back to the UI thread via `winrt::apartment_context` before
+  calling `MethodResult::Success` / `Error`.
+
+### Supported Image Formats
+
+Any format decodable by the Windows Imaging Component (WIC):
+PNG, JPEG, BMP, TIFF, GIF, JPEG-XR (HD Photo). This is slightly different
+from macOS (which additionally supports HEIF).
+
+### Deployment Target
+
+Requires **Windows 10 version 1809** (October 2018 Update, build 17763) or
+later, which is the minimum version shipping the `Windows.Media.Ocr` WinRT
+API with broad language support. No special app capabilities are required.
+
+### Dart Adapter (`lib/infrastructure/ocr/ocr_engine_windows.dart`)
+
+- `WindowsOcrEngine` implements `OCREngine`.
+- Accepts an optional `MethodChannel` in the constructor for test injection.
+- Maps `FileOcrInput` → `filePath` argument, `MemoryOcrInput` → `imageBytes`
+  argument.
+- Catches `PlatformException` and rethrows as `OcrEngineError` with the
+  original exception attached.
+
+### Limitations
+
+- **No confidence score** — the API does not provide one.
+- **Language-pack dependent** — OCR quality depends on which language packs
+  the user has installed. English (`en-US`) is pre-installed on most systems.
+- **Maximum image size** — `OcrEngine::RecognizeAsync` may fail on very large
+  bitmaps (> 4096 × 4096 px on some builds). Rendered PDF pages at 300 DPI
+  are typically within this limit.
