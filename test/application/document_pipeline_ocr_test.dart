@@ -213,5 +213,36 @@ void main() {
         expect(p.ocrConfidence, 0.8);
       }
     });
+
+    // -------------------------------------------------------------------------
+    // FTS sync
+    // -------------------------------------------------------------------------
+
+    test('calls FTS sync exactly once with the document ID after all pages processed', () async {
+      const docId = 'doc-1';
+      final doc = makeDocument(id: docId);
+      final pages = makePages(3, documentId: docId);
+      final ocrInput = MemoryOcrInput(Uint8List(4));
+      const ocrPageResult = OcrPageResult(rawText: 'world', confidence: 0.9);
+
+      when(() => mockDocumentRepository.findById(docId))
+          .thenAnswer((_) async => doc);
+      when(() => mockDocumentRepository.update(any()))
+          .thenAnswer((inv) async => inv.positionalArguments.first as Document);
+      when(() => mockPageRepository.findByDocumentId(docId))
+          .thenAnswer((_) async => pages);
+      when(() => mockRenderer.renderPage(any(), any()))
+          .thenAnswer((_) async => ocrInput);
+      when(() => mockOcrEngine.extractText(any()))
+          .thenAnswer((_) async => ocrPageResult);
+      when(() => mockPageRepository.update(any())).thenAnswer((_) async {});
+
+      await pipeline.runOcrForDocument(docId);
+
+      // FTS sync must be called exactly once, after all pages are processed.
+      verify(() => mockSearchIndexSync.syncDocument(docId)).called(1);
+      // All 3 pages must have been updated before sync fires.
+      verify(() => mockPageRepository.update(any())).called(3);
+    });
   });
 }
