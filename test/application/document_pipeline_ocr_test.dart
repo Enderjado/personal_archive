@@ -14,6 +14,7 @@ import 'package:personal_archive/src/domain/ocr_engine.dart';
 import 'package:personal_archive/src/domain/ocr_types.dart';
 import 'package:personal_archive/src/domain/page.dart';
 import 'package:personal_archive/src/application/ocr_pipeline_errors.dart';
+import 'package:personal_archive/src/application/ocr_result.dart';
 import 'package:personal_archive/src/domain/page_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -163,5 +164,54 @@ void main() {
         verifyNever(() => mockDocumentRepository.update(any()));
       });
     }
+
+    // -------------------------------------------------------------------------
+    // Success path
+    // -------------------------------------------------------------------------
+
+    test('updates status to completed and each page with OCR results', () async {
+      const docId = 'doc-1';
+      final doc = makeDocument(id: docId);
+      final pages = makePages(3, documentId: docId);
+      final ocrInput = MemoryOcrInput(Uint8List(4));
+      const ocrPageResult = OcrPageResult(rawText: 'hello', confidence: 0.8);
+
+      when(() => mockDocumentRepository.findById(docId))
+          .thenAnswer((_) async => doc);
+      when(() => mockDocumentRepository.update(any()))
+          .thenAnswer((inv) async => inv.positionalArguments.first as Document);
+      when(() => mockPageRepository.findByDocumentId(docId))
+          .thenAnswer((_) async => pages);
+      when(() => mockRenderer.renderPage(any(), any()))
+          .thenAnswer((_) async => ocrInput);
+      when(() => mockOcrEngine.extractText(any()))
+          .thenAnswer((_) async => ocrPageResult);
+      when(() => mockPageRepository.update(any())).thenAnswer((_) async {});
+
+      final result = await pipeline.runOcrForDocument(docId);
+
+      // Returned OcrResult is correct.
+      expect(result.documentId, docId);
+      expect(result.pageCount, 3);
+      expect(result.aggregateConfidence, closeTo(0.8, 1e-9));
+
+      // Status transitions: processing → completed.
+      final capturedDocs = verify(
+        () => mockDocumentRepository.update(captureAny()),
+      ).captured.cast<Document>();
+      expect(capturedDocs.length, 2);
+      expect(capturedDocs[0].status, DocumentStatus.processing);
+      expect(capturedDocs[1].status, DocumentStatus.completed);
+
+      // Every page was updated with rawText and ocrConfidence.
+      final capturedPages = verify(
+        () => mockPageRepository.update(captureAny()),
+      ).captured.cast<Page>();
+      expect(capturedPages.length, 3);
+      for (final p in capturedPages) {
+        expect(p.rawText, 'hello');
+        expect(p.ocrConfidence, 0.8);
+      }
+    });
   });
 }
