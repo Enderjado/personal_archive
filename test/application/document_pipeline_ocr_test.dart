@@ -16,6 +16,7 @@ import 'package:personal_archive/src/domain/page.dart';
 import 'package:personal_archive/src/application/ocr_pipeline_errors.dart';
 import 'package:personal_archive/src/application/ocr_result.dart';
 import 'package:personal_archive/src/domain/ocr_error.dart';
+import 'package:personal_archive/src/domain/storage_error.dart';
 import 'package:personal_archive/src/application/pdf_page_image_renderer.dart'
     show PdfRenderError;
 import 'package:personal_archive/src/domain/page_repository.dart';
@@ -339,6 +340,46 @@ void main() {
 
       // OCR engine must never be reached.
       verifyNever(() => mockOcrEngine.extractText(any()));
+      verifyNever(() => mockSearchIndexSync.syncDocument(any()));
+    });
+
+    // -------------------------------------------------------------------------
+    // Storage failure
+    // -------------------------------------------------------------------------
+
+    test('sets document to failed and throws OcrStorageError when page update throws', () async {
+      const docId = 'doc-1';
+      final doc = makeDocument(id: docId);
+      final pages = makePages(2, documentId: docId);
+      final ocrInput = MemoryOcrInput(Uint8List(4));
+      const ocrPageResult = OcrPageResult(rawText: 'ok', confidence: 0.7);
+
+      when(() => mockDocumentRepository.findById(docId))
+          .thenAnswer((_) async => doc);
+      when(() => mockDocumentRepository.update(any()))
+          .thenAnswer((inv) async => inv.positionalArguments.first as Document);
+      when(() => mockPageRepository.findByDocumentId(docId))
+          .thenAnswer((_) async => pages);
+      when(() => mockRenderer.renderPage(any(), any()))
+          .thenAnswer((_) async => ocrInput);
+      when(() => mockOcrEngine.extractText(any()))
+          .thenAnswer((_) async => ocrPageResult);
+
+      // Page persistence throws on first write.
+      when(() => mockPageRepository.update(any()))
+          .thenThrow(const StorageUnknownError('disk full'));
+
+      await expectLater(
+        () => pipeline.runOcrForDocument(docId),
+        throwsA(isA<OcrStorageError>()),
+      );
+
+      // Document must be marked failed.
+      final capturedDocs = verify(
+        () => mockDocumentRepository.update(captureAny()),
+      ).captured.cast<Document>();
+      expect(capturedDocs.last.status, DocumentStatus.failed);
+
       verifyNever(() => mockSearchIndexSync.syncDocument(any()));
     });
   });
