@@ -13,6 +13,7 @@ import 'package:personal_archive/src/domain/document_repository.dart';
 import 'package:personal_archive/src/domain/ocr_engine.dart';
 import 'package:personal_archive/src/domain/ocr_types.dart';
 import 'package:personal_archive/src/domain/page.dart';
+import 'package:personal_archive/src/application/ocr_pipeline_errors.dart';
 import 'package:personal_archive/src/domain/page_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -111,6 +112,25 @@ void main() {
       registerFallbackValue(
         MemoryOcrInput(Uint8List(0)),
       );
+    });
+
+    // -------------------------------------------------------------------------
+    // Guard: document not found
+    // -------------------------------------------------------------------------
+
+    test('throws DocumentNotFoundError when document does not exist', () async {
+      when(() => mockDocumentRepository.findById(any()))
+          .thenAnswer((_) async => null);
+
+      await expectLater(
+        () => pipeline.runOcrForDocument('missing-id'),
+        throwsA(isA<DocumentNotFoundError>()),
+      );
+
+      verify(() => mockDocumentRepository.findById('missing-id')).called(1);
+      verifyNever(() => mockRenderer.renderPage(any(), any()));
+      verifyNever(() => mockOcrEngine.extractText(any()));
+      verifyNever(() => mockDocumentRepository.update(any()));
     });
   });
 }
