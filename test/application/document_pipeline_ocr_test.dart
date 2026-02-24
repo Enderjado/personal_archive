@@ -15,6 +15,7 @@ import 'package:personal_archive/src/domain/ocr_types.dart';
 import 'package:personal_archive/src/domain/page.dart';
 import 'package:personal_archive/src/application/ocr_pipeline_errors.dart';
 import 'package:personal_archive/src/application/ocr_result.dart';
+import 'package:personal_archive/src/domain/ocr_error.dart';
 import 'package:personal_archive/src/domain/page_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -243,6 +244,58 @@ void main() {
       verify(() => mockSearchIndexSync.syncDocument(docId)).called(1);
       // All 3 pages must have been updated before sync fires.
       verify(() => mockPageRepository.update(any())).called(3);
+    });
+
+    // -------------------------------------------------------------------------
+    // OCR engine failure
+    // -------------------------------------------------------------------------
+
+    test('sets document to failed and throws OcrEnginePipelineError when engine fails on page K', () async {
+      const docId = 'doc-1';
+      final doc = makeDocument(id: docId);
+      final pages = makePages(3, documentId: docId);
+      final ocrInput = MemoryOcrInput(Uint8List(4));
+      const successResult = OcrPageResult(rawText: 'ok', confidence: 0.9);
+
+      when(() => mockDocumentRepository.findById(docId))
+          .thenAnswer((_) async => doc);
+      when(() => mockDocumentRepository.update(any()))
+          .thenAnswer((inv) async => inv.positionalArguments.first as Document);
+      when(() => mockPageRepository.findByDocumentId(docId))
+          .thenAnswer((_) async => pages);
+      when(() => mockRenderer.renderPage(any(), any()))
+          .thenAnswer((_) async => ocrInput);
+      when(() => mockPageRepository.update(any())).thenAnswer((_) async {});
+
+      // Engine succeeds on page 1, throws on page 2 (K=2).
+      var engineCallCount = 0;
+      when(() => mockOcrEngine.extractText(any())).thenAnswer((_) async {
+        engineCallCount++;
+        if (engineCallCount == 2) {
+          throw const OcrEngineError('engine exploded');
+        }
+        return successResult;
+      });
+
+      await expectLater(
+        () => pipeline.runOcrForDocument(docId),
+        throwsA(
+          isA<OcrEnginePipelineError>().having(
+            (e) => e.pageNumber,
+            'pageNumber',
+            2,
+          ),
+        ),
+      );
+
+      // Document must be marked failed.
+      final capturedDocs = verify(
+        () => mockDocumentRepository.update(captureAny()),
+      ).captured.cast<Document>();
+      expect(capturedDocs.last.status, DocumentStatus.failed);
+
+      // FTS sync must NOT be called on failure.
+      verifyNever(() => mockSearchIndexSync.syncDocument(any()));
     });
   });
 }
