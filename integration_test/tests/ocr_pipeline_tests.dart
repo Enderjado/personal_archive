@@ -221,6 +221,59 @@ void main() {
 
     // ── Failure-path tests (commit 7) ────────────────────────────────────
 
-    // TODO(commit-7): assert document transitions to `failed` when OCR throws mid-run
+    testWidgets(
+      'document transitions to failed when OCR engine throws mid-run',
+      (WidgetTester tester) async {
+        // Arrange: engine succeeds on page 1 (index 0) but throws on page 2
+        // (index 1), simulating a partial OCR failure mid-document.
+        const pageCount = 13;
+        final ocrEngine = MockOcrEngine(
+          pages: List.generate(
+            pageCount,
+            (i) => MockOcrResponse(
+              rawText: 'page ${i + 1} text',
+              confidence: 0.90,
+            ),
+          ),
+          throwOnPageIndex: 1, // throw on the second extractText call
+        );
+
+        final ocrPipeline = buildPipeline(
+          renderer: MockPdfPageImageRenderer(),
+          ocrEngine: ocrEngine,
+        );
+
+        // Act: the pipeline must not let the OcrPipelineError escape uncaught;
+        // it should swallow it internally after marking the document as failed.
+        // We catch here in case the implementation re-throws (both are valid per
+        // the design — what matters is the persisted document state).
+        try {
+          await ocrPipeline.runOcrForDocument(importedDocumentId);
+        } catch (_) {
+          // Expected: OcrEnginePipelineError propagated after status update.
+        }
+
+        // Assert: document status is `failed` regardless of whether the error
+        // was re-thrown.
+        final savedDoc = await documentRepo.findById(importedDocumentId);
+        expect(savedDoc, isNotNull);
+        expect(
+          savedDoc!.status,
+          DocumentStatus.failed,
+          reason: 'document should be marked failed after OCR engine error',
+        );
+
+        // Assert: only page 1 (index 0) could have been processed before the
+        // throw; at most one page should have rawText set.
+        final pages = await pageRepo.findByDocumentId(importedDocumentId);
+        final pagesWithText =
+            pages.where((p) => p.rawText != null && p.rawText!.isNotEmpty);
+        expect(
+          pagesWithText.length,
+          lessThanOrEqualTo(1),
+          reason: 'at most the first page should have rawText after mid-run failure',
+        );
+      },
+    );
   });
 }
