@@ -13,6 +13,8 @@ import 'package:personal_archive/infrastructure/sqlite/sqlite_fts_sync_service.d
 import 'package:personal_archive/infrastructure/sqlite/sqlite_page_repository.dart';
 import 'package:personal_archive/src/application/document_pipeline_impl.dart';
 import 'package:personal_archive/src/application/import_validator.dart';
+import 'package:personal_archive/src/application/ocr_result.dart';
+import 'package:personal_archive/src/domain/document.dart';
 
 import '../helpers/mock_ocr_engine.dart';
 import '../helpers/mock_pdf_page_image_renderer.dart';
@@ -95,7 +97,42 @@ void main() {
 
     // ── Happy-path tests (commits 4, 5, 6) ───────────────────────────────
 
-    // TODO(commit-4): assert document reaches `completed` after runOcrForDocument
+    testWidgets(
+      'runOcrForDocument returns OcrResult and document reaches completed',
+      (WidgetTester tester) async {
+        // Arrange: one MockOcrResponse per page (test PDF has 13 pages).
+        const pageCount = 13;
+        final ocrEngine = MockOcrEngine(
+          pages: List.generate(
+            pageCount,
+            (i) => MockOcrResponse(
+              rawText: 'mock text for page ${i + 1}',
+              confidence: 0.90 + i * 0.001,
+            ),
+          ),
+        );
+
+        final ocrPipeline = buildPipeline(
+          renderer: MockPdfPageImageRenderer(),
+          ocrEngine: ocrEngine,
+        );
+
+        // Act.
+        final result = await ocrPipeline.runOcrForDocument(importedDocumentId);
+
+        // Assert: OcrResult shape.
+        expect(result, isA<OcrResult>());
+        expect(result.documentId, importedDocumentId);
+        expect(result.pageCount, pageCount);
+        expect(result.aggregateConfidence, isNotNull);
+
+        // Assert: persisted document status.
+        final savedDoc = await documentRepo.findById(importedDocumentId);
+        expect(savedDoc, isNotNull);
+        expect(savedDoc!.status, DocumentStatus.completed);
+      },
+    );
+
     // TODO(commit-5): assert every page carries rawText and ocrConfidence from mock
     // TODO(commit-6): assert FTS query surfaces document after OCR writes text
 
