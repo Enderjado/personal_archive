@@ -1,0 +1,66 @@
+# Runs the optional platform-specific OCR integration tests on the native OS
+# runners where the real OCR engine is available.
+#
+# These tests are intentionally NOT part of the default CI matrix: they
+# require native platform APIs (Apple Vision on macOS, WinRT on Windows) and
+# may be slower than the mock-based integration tests.  A failure here does
+# not block pull requests on other platforms.
+#
+# Trigger manually via workflow_dispatch, or add push/pull_request triggers
+# scoped to the paths that affect the OCR adapters when desired.
+
+name: Platform OCR Integration Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # macOS — Apple Vision OCR
+  # ---------------------------------------------------------------------------
+  macos-ocr:
+    name: Real OCR – macOS
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run macOS OCR integration test
+        run: |
+          flutter test integration_test \
+            --device-id macos \
+            --dart-define=RUN_PLATFORM_OCR=true
+
+  # ---------------------------------------------------------------------------
+  # Windows — WinRT Windows.Media.Ocr
+  # ---------------------------------------------------------------------------
+  windows-ocr:
+    name: Real OCR – Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Windows OCR integration test
+        run: |
+          flutter test integration_test `
+            --device-id windows `
+            --dart-define=RUN_PLATFORM_OCR=true
