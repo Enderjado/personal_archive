@@ -177,7 +177,47 @@ void main() {
       },
     );
 
-    // TODO(commit-6): assert FTS query surfaces document after OCR writes text
+    testWidgets(
+      'FTS index contains mock OCR text and returns document after runOcrForDocument',
+      (WidgetTester tester) async {
+        // Arrange: embed a phrase that is unique to the mock OCR output so the
+        // FTS query cannot accidentally match the document title or other content.
+        const uniquePhrase = 'fts-unique-ocr-phrase';
+        const pageCount = 13;
+        final ocrPipeline = buildPipeline(
+          renderer: MockPdfPageImageRenderer(),
+          ocrEngine: MockOcrEngine(
+            pages: List.generate(
+              pageCount,
+              (i) => MockOcrResponse(
+                // Only the first page embeds the unique phrase; the rest are
+                // plain filler so the FTS match is unambiguous.
+                rawText: i == 0
+                    ? 'first page contains $uniquePhrase for search'
+                    : 'filler text for page ${i + 1}',
+                confidence: 0.95,
+              ),
+            ),
+          ),
+        );
+
+        // Act.
+        await ocrPipeline.runOcrForDocument(importedDocumentId);
+
+        // Assert: FTS table has a row for the document whose content contains
+        // the unique phrase.
+        final rows = db.select(
+          'SELECT document_id FROM documents_fts WHERE documents_fts MATCH ?',
+          [uniquePhrase],
+        );
+
+        expect(rows, isNotEmpty, reason: 'FTS index should contain the mock OCR phrase');
+        expect(
+          rows.map((r) => r['document_id']).toList(),
+          contains(importedDocumentId),
+        );
+      },
+    );
 
     // ── Failure-path tests (commit 7) ────────────────────────────────────
 
