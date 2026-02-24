@@ -133,7 +133,50 @@ void main() {
       },
     );
 
-    // TODO(commit-5): assert every page carries rawText and ocrConfidence from mock
+    testWidgets(
+      'every page has rawText and ocrConfidence matching mock output after OCR',
+      (WidgetTester tester) async {
+        // Arrange: deterministic per-page responses with distinct text and
+        // confidence values so any mix-up in ordering is immediately visible.
+        const pageCount = 13;
+        final responses = List.generate(
+          pageCount,
+          (i) => MockOcrResponse(
+            rawText: 'deterministic page ${i + 1} content',
+            confidence: 0.80 + i * 0.01,
+          ),
+        );
+
+        final ocrPipeline = buildPipeline(
+          renderer: MockPdfPageImageRenderer(),
+          ocrEngine: MockOcrEngine(pages: responses),
+        );
+
+        // Act.
+        await ocrPipeline.runOcrForDocument(importedDocumentId);
+
+        // Assert: fetch pages sorted by pageNumber so index == pageNumber - 1.
+        final pages = await pageRepo.findByDocumentId(importedDocumentId);
+        pages.sort((a, b) => a.pageNumber.compareTo(b.pageNumber));
+
+        expect(pages.length, pageCount);
+        for (var i = 0; i < pageCount; i++) {
+          final page = pages[i];
+          final expected = responses[i];
+          expect(
+            page.rawText,
+            expected.rawText,
+            reason: 'rawText mismatch on page ${i + 1}',
+          );
+          expect(
+            page.ocrConfidence,
+            closeTo(expected.confidence!, 1e-9),
+            reason: 'ocrConfidence mismatch on page ${i + 1}',
+          );
+        }
+      },
+    );
+
     // TODO(commit-6): assert FTS query surfaces document after OCR writes text
 
     // ── Failure-path tests (commit 7) ────────────────────────────────────
