@@ -16,6 +16,8 @@ import 'package:personal_archive/src/domain/page.dart';
 import 'package:personal_archive/src/application/ocr_pipeline_errors.dart';
 import 'package:personal_archive/src/application/ocr_result.dart';
 import 'package:personal_archive/src/domain/ocr_error.dart';
+import 'package:personal_archive/src/application/pdf_page_image_renderer.dart'
+    show PdfRenderError;
 import 'package:personal_archive/src/domain/page_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -295,6 +297,48 @@ void main() {
       expect(capturedDocs.last.status, DocumentStatus.failed);
 
       // FTS sync must NOT be called on failure.
+      verifyNever(() => mockSearchIndexSync.syncDocument(any()));
+    });
+
+    // -------------------------------------------------------------------------
+    // Render failure
+    // -------------------------------------------------------------------------
+
+    test('sets document to failed and throws OcrRenderError when renderer throws', () async {
+      const docId = 'doc-1';
+      final doc = makeDocument(id: docId);
+      final pages = makePages(2, documentId: docId);
+
+      when(() => mockDocumentRepository.findById(docId))
+          .thenAnswer((_) async => doc);
+      when(() => mockDocumentRepository.update(any()))
+          .thenAnswer((inv) async => inv.positionalArguments.first as Document);
+      when(() => mockPageRepository.findByDocumentId(docId))
+          .thenAnswer((_) async => pages);
+
+      // Renderer throws on first page.
+      when(() => mockRenderer.renderPage(any(), any()))
+          .thenThrow(const PdfRenderError('corrupt page'));
+
+      await expectLater(
+        () => pipeline.runOcrForDocument(docId),
+        throwsA(
+          isA<OcrRenderError>().having(
+            (e) => e.pageNumber,
+            'pageNumber',
+            1,
+          ),
+        ),
+      );
+
+      // Document must be marked failed.
+      final capturedDocs = verify(
+        () => mockDocumentRepository.update(captureAny()),
+      ).captured.cast<Document>();
+      expect(capturedDocs.last.status, DocumentStatus.failed);
+
+      // OCR engine must never be reached.
+      verifyNever(() => mockOcrEngine.extractText(any()));
       verifyNever(() => mockSearchIndexSync.syncDocument(any()));
     });
   });
