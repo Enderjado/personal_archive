@@ -3,6 +3,13 @@ import 'dart:typed_data' show Uint8List;
 import 'package:personal_archive/src/application/pdf_page_image_renderer.dart';
 import 'package:personal_archive/src/domain/ocr_types.dart';
 
+/// A recorded [renderPage] invocation.
+class RenderCall {
+  const RenderCall(this.pdfPath, this.pageNumber);
+  final String pdfPath;
+  final int pageNumber;
+}
+
 /// A minimal 1×1 white PNG used as the default [MemoryOcrInput] bytes.
 ///
 /// This is a valid PNG bytestream so it can be passed to any code that
@@ -37,12 +44,12 @@ class MockPdfPageImageRenderer implements PdfPageImageRenderer {
 
   final OcrInput _fixedInput;
 
-  /// All `(pdfPath, pageNumber)` pairs received, in call order.
-  final List<(String, int)> renderCalls = [];
+  /// All [RenderCall] records received, in call order.
+  final List<RenderCall> renderCalls = [];
 
   @override
   Future<OcrInput> renderPage(String pdfPath, int pageNumber) async {
-    renderCalls.add((pdfPath, pageNumber));
+    renderCalls.add(RenderCall(pdfPath, pageNumber));
     return _fixedInput;
   }
 }

@@ -182,7 +182,7 @@ void main() {
       (WidgetTester tester) async {
         // Arrange: embed a phrase that is unique to the mock OCR output so the
         // FTS query cannot accidentally match the document title or other content.
-        const uniquePhrase = 'fts-unique-ocr-phrase';
+        const uniquePhrase = 'fts_unique_ocr_phrase';
         const pageCount = 13;
         final ocrPipeline = buildPipeline(
           renderer: MockPdfPageImageRenderer(),
