@@ -132,5 +132,36 @@ void main() {
       verifyNever(() => mockOcrEngine.extractText(any()));
       verifyNever(() => mockDocumentRepository.update(any()));
     });
+
+    // -------------------------------------------------------------------------
+    // Guard: invalid document state
+    // -------------------------------------------------------------------------
+
+    for (final status in [
+      DocumentStatus.processing,
+      DocumentStatus.completed,
+      DocumentStatus.failed,
+    ]) {
+      test('throws InvalidDocumentStateError when document is $status', () async {
+        when(() => mockDocumentRepository.findById(any()))
+            .thenAnswer((_) async => makeDocument(status: status));
+
+        await expectLater(
+          () => pipeline.runOcrForDocument('doc-1'),
+          throwsA(
+            isA<InvalidDocumentStateError>().having(
+              (e) => e.currentStatus,
+              'currentStatus',
+              status,
+            ),
+          ),
+        );
+
+        verify(() => mockDocumentRepository.findById('doc-1')).called(1);
+        verifyNever(() => mockRenderer.renderPage(any(), any()));
+        verifyNever(() => mockOcrEngine.extractText(any()));
+        verifyNever(() => mockDocumentRepository.update(any()));
+      });
+    }
   });
 }
