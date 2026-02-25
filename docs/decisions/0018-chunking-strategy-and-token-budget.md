@@ -6,7 +6,7 @@ Status: Accepted
 
 ## Context
 
-Phase 4 Intelligence features (summarization, keyword extraction, place detection, future classifiers) run on a local Qwen 2.5 0.5B model via llama.cpp (see ADR 0003).
+Phase 4 Intelligence features (summarization, keyword extraction, place detection, future classifiers) run on a local Qwen 3 0.6B model via llama.cpp (see ADR 0003).
 
 We need a **chunking strategy and token budget** that:
 
@@ -19,7 +19,7 @@ This ADR defines **how we split text into LLM chunks** and how much of the conte
 ## Decision
 
 - **Target context usage**
-  - Assume a conservative **effective context window of ~4,096 tokens** for Qwen 2.5 0.5B in our local configuration.
+  - Assume a conservative **effective context window of ~4,096 tokens** for Qwen 3 0.6B in our local configuration.
   - Reserve **~25% of the window for system/user prompts and model output**, leaving **~3,000 tokens** for document content per request.
 
 - **Chunk size**

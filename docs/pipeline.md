@@ -14,6 +14,16 @@ Every document flows through a deterministic pipeline that ensures:
 
 For Phase 2 PDF import implementation details (objectives, scope, storage, validation, interfaces, and cleanup semantics), see `pdf_import_pipeline.md`.
 
+For Phase 4 Intelligence behavior and LLM integration, see:
+
+- `intelligence_overview.md`
+- `llm_integration.md`
+- `decisions/0003-use-llama-cpp-for-local-llm.md`
+- `decisions/0017-processed-text-storage-for-intelligence.md`
+- `decisions/0018-chunking-strategy-and-token-budget.md`
+- `decisions/0019-llm-default-configuration-for-intelligence.md`
+- `decisions/0020-intelligence-pipeline-behavior-and-partial-results.md`
+
 The pipeline follows this sequence:
 
 
@@ -151,6 +161,8 @@ The pipeline follows this sequence:
 **Notes:**
 
 * LLM runtime is managed by `LLMRuntime` to ensure proper memory usage and concurrency.
+* For high-level Intelligence behavior and configuration, see `intelligence_overview.md` and ADRs `0018`, `0019`, `0020`.
+* For runtime integration details, see `llm_integration.md` and ADR `0003`.
 
 ---
 
@@ -267,6 +279,8 @@ Stored as placeId in the document entity.
 3. **Observable:** Logs, timing, confidence scores, and errors are recorded.
 4. **Isolated Failures:** Failures in one stage do not corrupt other stages; retry is possible.
 5. **Replaceable Components:** OCR, LLM, and text processors can be swapped without touching domain logic.
+
+For an Intelligence-focused view of these principles and how they apply to chunking, partial results, and re-runs, see `intelligence_overview.md` and ADR `0020-intelligence-pipeline-behavior-and-partial-results.md`.
 
 ---
 
