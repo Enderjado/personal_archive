@@ -130,3 +130,13 @@ For Phase 2 PDF import implementation details and decisions, see:
 * `decisions/0012-file-storage-strategy-for-imported-pdfs.md`
 * `decisions/0013-pdf-library-choice-for-metadata.md`
 
+For Phase 4 Intelligence and local LLM behavior, see:
+
+* `intelligence_overview.md`
+* `llm_integration.md`
+* `decisions/0003-use-llama-cpp-for-local-llm.md`
+* `decisions/0017-processed-text-storage-for-intelligence.md`
+* `decisions/0018-chunking-strategy-and-token-budget.md`
+* `decisions/0019-llm-default-configuration-for-intelligence.md`
+* `decisions/0020-intelligence-pipeline-behavior-and-partial-results.md`
+
