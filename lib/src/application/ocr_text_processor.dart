@@ -1,3 +1,4 @@
+import '../domain/text_processing_config.dart';
 import '../domain/text_processor.dart';
 
 /// A concrete [TextProcessor] that cleans raw OCR output in multiple passes.
@@ -5,11 +6,14 @@ import '../domain/text_processor.dart';
 /// Each pass targets a specific class of noise. Passes are applied in order:
 /// 1. Whitespace and line-break normalisation (always active).
 /// 2. Hyphenation rejoining – merges words split across lines by a hyphen.
+/// 3. Header/footer stripping – removes lines matching patterns in [config].
 ///
-/// This class is pure and stateless; the same input always yields the same
-/// output, making it straightforward to test and safe to cache.
+/// This class is pure; given the same [config] and the same input the output
+/// is always identical, making it straightforward to test.
 class OcrTextProcessor implements TextProcessor {
-  const OcrTextProcessor();
+  const OcrTextProcessor({this.config = const TextProcessingConfig()});
+
+  final TextProcessingConfig config;
 
   @override
   String clean(String raw) {
@@ -21,6 +25,7 @@ class OcrTextProcessor implements TextProcessor {
     text = _normaliseWhitespace(text);
     text = _trimLines(text);
     text = _collapseBlankLines(text);
+    text = _stripHeadersAndFooters(text);
     return text.trim();
   }
 
@@ -68,5 +73,33 @@ class OcrTextProcessor implements TextProcessor {
       RegExp(r'([a-zA-Z])-\n([a-zA-Z])'),
       (m) => '${m[1]}${m[2]}',
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pass 3 – header and footer stripping
+  // ---------------------------------------------------------------------------
+
+  /// Removes any line whose entire trimmed content matches a header or footer
+  /// pattern defined in [config].
+  ///
+  /// Matching is full-line: a pattern must cover the whole line, not just a
+  /// substring. This prevents accidental removal of lines that merely
+  /// *contain* a common word.
+  String _stripHeadersAndFooters(String text) {
+    if (config.headerPatterns.isEmpty && config.footerPatterns.isEmpty) {
+      return text;
+    }
+
+    final allPatterns = [
+      ...config.headerPatterns,
+      ...config.footerPatterns,
+    ].map((p) => RegExp('^$p\$')).toList();
+
+    final lines = text.split('\n');
+    final filtered = lines.where((line) {
+      final trimmed = line.trim();
+      return !allPatterns.any((re) => re.hasMatch(trimmed));
+    });
+    return filtered.join('\n');
   }
 }

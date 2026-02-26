@@ -25,4 +25,5 @@ export 'storage_error.dart';
 export 'summary.dart';
 export 'summary_repository.dart';
 export 'text_chunk.dart';
+export 'text_processing_config.dart';
 export 'text_processor.dart';
