@@ -2,6 +2,7 @@ import 'package:personal_archive/infrastructure/pdf/pdf_metadata_reader_impl.dar
 import 'package:personal_archive/infrastructure/pdf/pdf_page_image_renderer_impl.dart';
 import 'package:personal_archive/src/application/application.dart';
 import 'package:personal_archive/src/domain/ocr_config.dart';
+import 'package:personal_archive/src/domain/page_repository.dart';
 
 /// Simple service locator for dependency injection.
 ///
@@ -15,6 +16,8 @@ class ServiceLocator {
   PdfMetadataReader? _pdfMetadataReader;
   PdfPageImageRenderer? _pdfPageImageRenderer;
   ImportValidator? _importValidator;
+  PageRepository? _pageRepository;
+  TextProcessingService? _textProcessingService;
   OcrConfig _ocrConfig = const OcrConfig();
 
   /// Returns the registered [PdfMetadataReader] implementation.
@@ -63,11 +66,49 @@ class ServiceLocator {
     _importValidator = validator;
   }
 
+  /// Returns the registered [PageRepository] implementation.
+  ///
+  /// Must be set via the setter before first access; no default implementation
+  /// can be created without a database handle.
+  PageRepository get pageRepository {
+    assert(
+      _pageRepository != null,
+      'PageRepository has not been registered. '
+      'Call ServiceLocator.instance.pageRepository = ... before use.',
+    );
+    return _pageRepository!;
+  }
+
+  /// Overrides the [PageRepository] instance.
+  set pageRepository(PageRepository repository) {
+    _pageRepository = repository;
+    _textProcessingService = null; // force re-creation with new repository
+  }
+
+  /// Returns the registered [TextProcessingService] implementation.
+  ///
+  /// Lazily constructed from [pageRepository] and [OcrTextProcessor] on first
+  /// access. Override via the setter to supply a custom implementation
+  /// (e.g. in tests).
+  TextProcessingService get textProcessingService {
+    return _textProcessingService ??= TextProcessingServiceImpl(
+      pageRepository: pageRepository,
+      textProcessor: const OcrTextProcessor(),
+    );
+  }
+
+  /// Overrides the [TextProcessingService] instance (useful for testing).
+  set textProcessingService(TextProcessingService service) {
+    _textProcessingService = service;
+  }
+
   /// Resets all registrations. Intended for test teardown only.
   void reset() {
     _pdfMetadataReader = null;
     _pdfPageImageRenderer = null;
     _importValidator = null;
+    _pageRepository = null;
+    _textProcessingService = null;
     _ocrConfig = const OcrConfig();
   }
 }
