@@ -15,6 +15,11 @@ import 'text_processing_service.dart';
 /// a partially OCR-processed document should not block text processing for
 /// the pages that do have text.
 ///
+/// ### Idempotency
+/// Pages that already have a non-null `processedText` are skipped without
+/// issuing a storage write. Re-running the service on a fully processed
+/// document is therefore a safe no-op.
+///
 /// This class has no dependency on UI or Flutter; it can be used from a
 /// background isolate, a pipeline step, or a test without any additional setup.
 class TextProcessingServiceImpl implements TextProcessingService {
@@ -40,6 +45,10 @@ class TextProcessingServiceImpl implements TextProcessingService {
       // is left as-is (null) so a subsequent run can pick them up once OCR
       // completes.
       if (raw == null) continue;
+
+      // Idempotency: skip pages that have already been processed so that
+      // re-running the service does not issue redundant storage writes.
+      if (page.processedText != null) continue;
 
       final cleaned = textProcessor.clean(raw);
       final updated = page.copyWith(processedText: cleaned);
