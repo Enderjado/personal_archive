@@ -24,6 +24,10 @@ class TextProcessingServiceImpl implements TextProcessingService {
   Future<void> processDocument(String documentId) async {
     final pages = await pageRepository.findByDocumentId(documentId);
 
+    if (pages.isEmpty) {
+      throw DocumentHasNoPagesError(documentId);
+    }
+
     for (final page in pages) {
       final raw = page.rawText;
       if (raw == null) continue;
