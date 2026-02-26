@@ -141,4 +141,52 @@ void main() {
       expect(repo.updatedPages, hasLength(1));
     });
   });
+
+  group('TextProcessingServiceImpl – idempotency', () {
+    test('processedText is unchanged after a second run', () async {
+      final pages = [
+        _page(id: 'p1', documentId: docId, pageNumber: 1, rawText: 'raw one'),
+        _page(id: 'p2', documentId: docId, pageNumber: 2, rawText: 'raw two'),
+      ];
+      final repo = _FakePageRepository(pages);
+      final service = TextProcessingServiceImpl(
+        pageRepository: repo,
+        textProcessor: processor,
+      );
+
+      await service.processDocument(docId);
+      final afterFirst = (await repo.findByDocumentId(docId))
+          .map((p) => p.processedText)
+          .toList();
+
+      await service.processDocument(docId);
+      final afterSecond = (await repo.findByDocumentId(docId))
+          .map((p) => p.processedText)
+          .toList();
+
+      expect(afterSecond, equals(afterFirst));
+    });
+
+    test('does not call update for already-processed pages on second run',
+        () async {
+      final pages = [
+        _page(id: 'p1', documentId: docId, pageNumber: 1, rawText: 'raw one'),
+        _page(id: 'p2', documentId: docId, pageNumber: 2, rawText: 'raw two'),
+      ];
+      final repo = _FakePageRepository(pages);
+      final service = TextProcessingServiceImpl(
+        pageRepository: repo,
+        textProcessor: processor,
+      );
+
+      await service.processDocument(docId);
+      final updatesAfterFirst = repo.updatedPages.length;
+
+      await service.processDocument(docId);
+      final updatesAfterSecond = repo.updatedPages.length;
+
+      // No additional updates should have been issued on the second run.
+      expect(updatesAfterSecond, equals(updatesAfterFirst));
+    });
+  });
 }
