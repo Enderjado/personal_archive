@@ -4,6 +4,7 @@ import '../domain/text_processor.dart';
 ///
 /// Each pass targets a specific class of noise. Passes are applied in order:
 /// 1. Whitespace and line-break normalisation (always active).
+/// 2. Hyphenation rejoining – merges words split across lines by a hyphen.
 ///
 /// This class is pure and stateless; the same input always yields the same
 /// output, making it straightforward to test and safe to cache.
@@ -16,6 +17,7 @@ class OcrTextProcessor implements TextProcessor {
 
     var text = raw;
     text = _normaliseLineEndings(text);
+    text = _rejoinHyphenation(text);
     text = _normaliseWhitespace(text);
     text = _trimLines(text);
     text = _collapseBlankLines(text);
@@ -46,5 +48,25 @@ class OcrTextProcessor implements TextProcessor {
   /// preserving intentional paragraph breaks.
   String _collapseBlankLines(String text) {
     return text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pass 2 – hyphenation rejoining
+  // ---------------------------------------------------------------------------
+
+  /// Merges words that OCR split across two lines using a hyphen.
+  ///
+  /// Matches a letter, a hyphen, a newline, and another letter, then removes
+  /// the hyphen and newline so the two parts form one word.
+  ///
+  /// Examples:
+  /// - `recogni-\ntion`  →  `recognition`
+  /// - `first-\nclass`   →  `firstclass`  (intentional hyphens are rare in OCR
+  ///   body text; a follow-up dictionary pass may restore them if needed)
+  String _rejoinHyphenation(String text) {
+    return text.replaceAllMapped(
+      RegExp(r'([a-zA-Z])-\n([a-zA-Z])'),
+      (m) => '${m[1]}${m[2]}',
+    );
   }
 }
