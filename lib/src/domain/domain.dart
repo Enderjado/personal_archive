@@ -21,6 +21,7 @@ export 'pdf_metadata.dart';
 export 'place.dart';
 export 'place_repository.dart';
 export 'chunker.dart';
+export 'chunking_config.dart';
 export 'storage_error.dart';
 export 'summary.dart';
 export 'summary_repository.dart';
