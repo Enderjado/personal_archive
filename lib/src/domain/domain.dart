@@ -11,6 +11,8 @@ export 'import_configuration.dart';
 export 'import_validation_error.dart';
 export 'keyword.dart';
 export 'keyword_repository.dart';
+export 'llm_service.dart';
+export 'llm_types.dart';
 export 'ocr_config.dart';
 export 'ocr_engine.dart';
 export 'ocr_error.dart';
@@ -28,3 +30,4 @@ export 'summary_repository.dart';
 export 'text_chunk.dart';
 export 'text_processing_config.dart';
 export 'text_processor.dart';
+
