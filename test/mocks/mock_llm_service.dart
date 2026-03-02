@@ -1,5 +1,28 @@
 import 'package:personal_archive/src/domain/domain.dart';
 
+/// Holds the call count statistics for mock LLM operations.
+class LLMServiceCallCounts {
+  /// Number of times [LLMService.summarize] was called.
+  final int summarizeCalls;
+
+  /// Number of times [LLMService.extractKeywords] was called.
+  final int extractKeywordsCalls;
+
+  /// Number of times [LLMService.detectPlaces] was called.
+  final int detectPlacesCalls;
+
+  /// Creates call count statistics.
+  const LLMServiceCallCounts({
+    required this.summarizeCalls,
+    required this.extractKeywordsCalls,
+    required this.detectPlacesCalls,
+  });
+
+  @override
+  String toString() =>
+      'LLMServiceCallCounts(summarizeCalls: $summarizeCalls, extractKeywordsCalls: $extractKeywordsCalls, detectPlacesCalls: $detectPlacesCalls)';
+}
+
 /// Mock implementation of [LLMService] for unit testing.
 ///
 /// Provides deterministic, customizable responses for all LLM operations.
@@ -92,12 +115,11 @@ class MockLLMService implements LLMService {
   }
 
   /// Returns the number of times each operation was called.
-  ({int summarizeCalls, int extractKeywordsCalls, int detectPlacesCalls})
-      getCallCounts() => (
-            summarizeCalls: this.summarizeCalls.length,
-            extractKeywordsCalls: this.extractKeywordsCalls.length,
-            detectPlacesCalls: this.detectPlacesCalls.length,
-          );
+  LLMServiceCallCounts getCallCounts() => LLMServiceCallCounts(
+        summarizeCalls: this.summarizeCalls.length,
+        extractKeywordsCalls: this.extractKeywordsCalls.length,
+        detectPlacesCalls: this.detectPlacesCalls.length,
+      );
 
   @override
   Future<String> summarize(String text) async {
